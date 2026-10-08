@@ -9,11 +9,23 @@ import '../security/redactor.dart';
 class NetworkErrorMapper {
   const NetworkErrorMapper();
 
-  // errno values for macOS/BSD, Linux and Windows (WSA).
-  static const _refused = {61, 111, 10061};
-  static const _reset = {54, 104, 10054, 32, 10053};
-  static const _unreachable = {50, 51, 65, 101, 113, 10050, 10051, 10065};
-  static const _timedOut = {60, 110, 10060};
+  // errno values for macOS/BSD, Linux, Winsock and Windows system errors
+  // (Dart on Windows reports e.g. ERROR_CONNECTION_REFUSED = 1225).
+  static const _refused = {61, 111, 10061, 1225};
+  static const _reset = {54, 104, 10054, 32, 10053, 64, 1236};
+  static const _unreachable = {
+    50,
+    51,
+    65,
+    101,
+    113,
+    10050,
+    10051,
+    10065,
+    1231,
+    1232,
+  };
+  static const _timedOut = {60, 110, 10060, 121, 1460};
 
   NetworkFailure map(Object error, {required Duration timeout}) {
     final seconds = _formatSeconds(timeout);
@@ -125,7 +137,7 @@ class NetworkErrorMapper {
         debugDetail: _detail(e),
       );
     }
-    if (_refused.contains(code) || message.contains('connection refused')) {
+    if (_refused.contains(code) || message.contains('refused')) {
       return NetworkFailure(
         NetworkFailureKind.connectionRefused,
         'Connection refused. Make sure the server is running and the port is correct.',
