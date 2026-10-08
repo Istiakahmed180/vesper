@@ -9,6 +9,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../features/api_client/domain/services/variable_resolver.dart';
 import '../../../features/api_client/presentation/response/body_formatter.dart';
 import '../../../features/environments/presentation/environment_providers.dart';
+import '../variable_autocomplete.dart';
 import 'syntax_highlighter.dart';
 
 /// Controller that syntax-highlights its text and colours `{{variables}}`.
@@ -99,6 +100,7 @@ class _CodeEditorState extends ConsumerState<CodeEditor> {
     text: widget.value,
   );
   final _scroll = ScrollController();
+  final _focus = FocusNode();
 
   @override
   void didUpdateWidget(CodeEditor old) {
@@ -115,6 +117,7 @@ class _CodeEditorState extends ConsumerState<CodeEditor> {
   void dispose() {
     _controller.dispose();
     _scroll.dispose();
+    _focus.dispose();
     super.dispose();
   }
 
@@ -151,22 +154,28 @@ class _CodeEditorState extends ConsumerState<CodeEditor> {
         },
         child: Scrollbar(
           controller: _scroll,
-          child: TextField(
+          child: VariableAutocomplete(
             controller: _controller,
-            scrollController: _scroll,
+            focusNode: _focus,
             onChanged: widget.onChanged,
-            maxLines: null,
-            expands: true,
-            textAlignVertical: TextAlignVertical.top,
-            keyboardType: TextInputType.multiline,
-            style: AppTheme.mono(context, size: 12.5),
-            decoration: InputDecoration(
-              hintText: widget.hint,
-              filled: false,
-              border: InputBorder.none,
-              enabledBorder: InputBorder.none,
-              focusedBorder: InputBorder.none,
-              contentPadding: const EdgeInsets.all(12),
+            child: TextField(
+              controller: _controller,
+              focusNode: _focus,
+              scrollController: _scroll,
+              onChanged: widget.onChanged,
+              maxLines: null,
+              expands: true,
+              textAlignVertical: TextAlignVertical.top,
+              keyboardType: TextInputType.multiline,
+              style: AppTheme.mono(context, size: 12.5),
+              decoration: InputDecoration(
+                hintText: widget.hint,
+                filled: false,
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                contentPadding: const EdgeInsets.all(12),
+              ),
             ),
           ),
         ),
