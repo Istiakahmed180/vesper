@@ -59,3 +59,6 @@ client_secret*.json
 # Local exports that may contain secrets
 *.vesper.json
 !test/**/*.vesper.json
+
+# Packaged installers
+/dist/
