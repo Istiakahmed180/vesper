@@ -1,0 +1,104 @@
+import 'dart:async';
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../core/di/app_providers.dart';
+import '../../../core/errors/app_failure.dart';
+import '../data/github_api.dart';
+import '../data/github_auth_repository.dart';
+import '../domain/github_models.dart';
+
+final githubApiProvider = Provider<GitHubApi>(
+  (ref) => GitHubApi(logger: ref.watch(loggerProvider)),
+);
+
+final githubAuthRepositoryProvider = Provider<GitHubAuthRepository>(
+  (ref) => GitHubAuthRepository(
+    api: ref.watch(githubApiProvider),
+    vault: ref.watch(vaultProvider),
+    config: ref.watch(appConfigProvider),
+    logger: ref.watch(loggerProvider),
+  ),
+);
+
+final githubSessionProvider =
+    AsyncNotifierProvider<GitHubController, GitHubSession?>(
+      GitHubController.new,
+    );
+
+class GitHubController extends AsyncNotifier<GitHubSession?> {
+  GitHubAuthRepository get _repo => ref.read(githubAuthRepositoryProvider);
+
+  @override
+  Future<GitHubSession?> build() =>
+      ref.watch(githubAuthRepositoryProvider).restore();
+
+  Future<DeviceCode> startConnect() => _repo.startDeviceFlow();
+
+  Future<void> completeConnect(
+    DeviceCode code, {
+    Future<void>? cancelled,
+  }) async {
+    final session = await _repo.completeDeviceFlow(code, cancelled: cancelled);
+    state = AsyncData(session);
+  }
+
+  Future<void> disconnect() async {
+    await _repo.disconnect();
+    await ref.read(settingsRepositoryProvider).remove(_syncTargetKey);
+    ref.invalidate(syncTargetProvider);
+    state = const AsyncData(null);
+  }
+
+  /// Called when an API call reports the token was revoked or expired.
+  Future<void> handleFailure(Object error) async {
+    if (error is AuthFailure && error.kind == AuthFailureKind.expired) {
+      await _repo.disconnect();
+      state = const AsyncData(null);
+    }
+  }
+}
+
+final githubReposProvider = FutureProvider.autoDispose<List<GitHubRepo>>((
+  ref,
+) async {
+  final session = await ref.watch(githubSessionProvider.future);
+  if (session == null) return const [];
+  try {
+    return await ref.read(githubApiProvider).listRepos(session.accessToken);
+  } catch (e) {
+    unawaited(ref.read(githubSessionProvider.notifier).handleFailure(e));
+    rethrow;
+  }
+});
+
+const _syncTargetKey = 'github.sync_target';
+
+final syncTargetProvider =
+    AsyncNotifierProvider<SyncTargetController, SyncTarget?>(
+      SyncTargetController.new,
+    );
+
+class SyncTargetController extends AsyncNotifier<SyncTarget?> {
+  @override
+  Future<SyncTarget?> build() async {
+    final json = await ref
+        .read(settingsRepositoryProvider)
+        .readJson(_syncTargetKey);
+    if (json == null) return null;
+    final target = SyncTarget.fromJson(json);
+    return target.repo.isEmpty ? null : target;
+  }
+
+  Future<void> select(SyncTarget target) async {
+    await ref
+        .read(settingsRepositoryProvider)
+        .writeJson(_syncTargetKey, target.toJson());
+    state = AsyncData(target);
+  }
+
+  Future<void> clear() async {
+    await ref.read(settingsRepositoryProvider).remove(_syncTargetKey);
+    state = const AsyncData(null);
+  }
+}
