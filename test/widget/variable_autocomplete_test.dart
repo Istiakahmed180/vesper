@@ -59,8 +59,18 @@ void main() {
 
     test('ranks prefix matches first and masks secrets', () {
       final all = variableSuggestions('', resolver, environmentName: 'Sandbox');
-      expect(all.take(3).map((s) => s.name), ['base_url', 'tenant', 'token']);
-      expect(all.last.name.startsWith(r'$'), isTrue);
+      expect(all.map((s) => s.name), ['base_url', 'tenant', 'token']);
+      final url = variableSuggestions('', resolver, hideCredentials: true);
+      expect(url.map((s) => s.name), ['base_url', 'tenant']);
+      final typed = variableSuggestions('to', resolver, hideCredentials: true);
+      expect(
+        typed.single.name,
+        'token',
+        reason: 'shown once the name is typed',
+      );
+      final dynamic = variableSuggestions(r'$', resolver);
+      expect(dynamic.map((s) => s.name), contains(r'$guid'));
+      expect(dynamic.every((s) => s.name.startsWith(r'$')), isTrue);
       final t = variableSuggestions('t', resolver);
       expect(t.map((s) => s.name).take(2), ['tenant', 'token']);
       expect(t[1].preview, isNot(contains('s3cret')));

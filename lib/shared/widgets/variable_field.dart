@@ -26,6 +26,7 @@ class VariableField extends ConsumerStatefulWidget {
     this.borderless = false,
     this.autofocus = false,
     this.enabled = true,
+    this.suggestCredentials = true,
   });
 
   final String value;
@@ -40,6 +41,9 @@ class VariableField extends ConsumerStatefulWidget {
   final bool borderless;
   final bool autofocus;
   final bool enabled;
+
+  /// Whether `{{` suggestions include token/password-like variables.
+  final bool suggestCredentials;
 
   @override
   ConsumerState<VariableField> createState() => _VariableFieldState();
@@ -123,6 +127,7 @@ class _VariableFieldState extends ConsumerState<VariableField> {
       controller: _controller,
       focusNode: _focus,
       onChanged: widget.onChanged,
+      hideCredentials: !widget.suggestCredentials,
       child: field,
     );
   }

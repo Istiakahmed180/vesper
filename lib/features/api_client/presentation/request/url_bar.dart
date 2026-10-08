@@ -105,6 +105,8 @@ class _UrlBarState extends ConsumerState<UrlBar> {
                       focusNode: _focus,
                       monospace: true,
                       borderless: true,
+                      // Credentials belong in Authorization/Headers.
+                      suggestCredentials: false,
                       hint:
                           'Enter a URL, {{base_url}}/path, or paste a cURL command',
                       onChanged: _onUrlChanged,

@@ -57,12 +57,17 @@ class VariableSuggestion {
   final String preview;
 }
 
-/// Suggestions for [query] from the active environment, globals and the
-/// dynamic variables, best matches first.
+/// Suggestions for [query] from the active environment and globals, best
+/// matches first. Dynamic variables (`$guid`…) only appear for `{{$`.
+///
+/// With [hideCredentials] (used by the URL bar), secret variables and names
+/// that look like credentials (token, password, key…) are left out unless the
+/// user has started typing their name.
 List<VariableSuggestion> variableSuggestions(
   String query,
   VariableResolver resolver, {
   String? environmentName,
+  bool hideCredentials = false,
   int limit = 8,
 }) {
   final q = query.toLowerCase();
@@ -83,8 +88,19 @@ List<VariableSuggestion> variableSuggestions(
       preview(e.value),
     );
   }
-  for (final e in VariableResolver.dynamicVariables.entries) {
-    all[e.key] = VariableSuggestion(e.key, 'Dynamic', e.value);
+  if (hideCredentials) {
+    all.removeWhere((name, _) {
+      final value = resolver.environment[name] ?? resolver.globals[name];
+      final credential =
+          (value?.isSecret ?? false) || Redactor.isSensitiveKey(name);
+      return credential && (q.isEmpty || !name.toLowerCase().startsWith(q));
+    });
+  }
+  // Built-in dynamic variables only when asked for explicitly with `{{$`.
+  if (query.startsWith(r'$')) {
+    for (final e in VariableResolver.dynamicVariables.entries) {
+      all[e.key] = VariableSuggestion(e.key, 'Dynamic', e.value);
+    }
   }
 
   int rank(String name) {
@@ -116,8 +132,11 @@ class VariableAutocomplete extends ConsumerStatefulWidget {
     required this.focusNode,
     required this.onChanged,
     required this.child,
+    this.hideCredentials = false,
   });
 
+  /// See [variableSuggestions].
+  final bool hideCredentials;
   final TextEditingController controller;
   final FocusNode focusNode;
   final ValueChanged<String> onChanged;
@@ -202,6 +221,7 @@ class _VariableAutocompleteState extends ConsumerState<VariableAutocomplete> {
             token.query,
             ref.read(variableResolverProvider),
             environmentName: ref.read(activeEnvironmentProvider)?.name,
+            hideCredentials: widget.hideCredentials,
           );
     final queryChanged = token?.query != _token?.query;
     setState(() {
