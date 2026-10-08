@@ -1,0 +1,102 @@
+name: Build Windows (Installer)
+
+# Runs only when started manually: Actions → "Build Windows (Installer)" → Run workflow.
+on:
+  workflow_dispatch:
+    inputs:
+      run_tests:
+        description: Run flutter analyze and flutter test before building
+        type: boolean
+        default: true
+      create_release:
+        description: Attach the installer to a draft GitHub Release (v<version>)
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.44.8
+          cache: true
+
+      # OAuth client IDs come from repository secrets (Settings → Secrets and
+      # variables → Actions). Missing secrets just leave sign-in unconfigured.
+      - name: Write build configuration (.env)
+        env:
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_DESKTOP_CLIENT_SECRET: ${{ secrets.GOOGLE_DESKTOP_CLIENT_SECRET }}
+          OAUTH_GITHUB_CLIENT_ID: ${{ secrets.OAUTH_GITHUB_CLIENT_ID }}
+        run: |
+          @(
+            "GOOGLE_CLIENT_ID=$env:GOOGLE_CLIENT_ID"
+            "GOOGLE_DESKTOP_CLIENT_SECRET=$env:GOOGLE_DESKTOP_CLIENT_SECRET"
+            "AUTH_BACKEND_URL="
+            "GITHUB_CLIENT_ID=$env:OAUTH_GITHUB_CLIENT_ID"
+            "GITHUB_SCOPES=read:user repo"
+            "API_BASE_URL="
+          ) | Set-Content -Path .env -Encoding utf8NoBOM
+
+      - run: flutter pub get
+
+      - name: Analyze and test
+        if: ${{ inputs.run_tests }}
+        run: |
+          flutter analyze
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          flutter test
+
+      - name: Build release app
+        run: flutter build windows --release --dart-define-from-file=.env
+
+      # App-local copy of the Visual C++ runtime so the app starts on PCs
+      # without the VC++ Redistributable installed.
+      - name: Bundle Visual C++ runtime
+        run: |
+          $release = "build\windows\x64\runner\Release"
+          foreach ($dll in "msvcp140.dll", "vcruntime140.dll", "vcruntime140_1.dll") {
+            Copy-Item "$env:WINDIR\System32\$dll" $release
+          }
+
+      - name: Read version
+        id: version
+        run: |
+          $v = (Select-String -Path pubspec.yaml -Pattern '^version:\s*([^+\s]+)').Matches[0].Groups[1].Value
+          "value=$v" >> $env:GITHUB_OUTPUT
+
+      - name: Build installer (Inno Setup)
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress }
+          & $iscc "/DAppVersion=${{ steps.version.outputs.value }}" windows\installer\vesper.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Vesper-Setup-${{ steps.version.outputs.value }}-Windows
+          path: dist/Vesper-Setup-*.exe
+          if-no-files-found: error
+
+      - name: Attach to draft release
+        if: ${{ inputs.create_release }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "v${{ steps.version.outputs.value }}"
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $tag --draft --title "Vesper ${{ steps.version.outputs.value }}" --notes "Vesper ${{ steps.version.outputs.value }}"
+          }
+          gh release upload $tag (Get-Item dist\Vesper-Setup-*.exe).FullName --clobber

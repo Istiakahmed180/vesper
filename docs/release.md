@@ -55,6 +55,31 @@ Sign `Vesper.exe` and the installer with `signtool sign /fd SHA256 /tr http://ti
 
 Runtime requirements: Windows 10 1809+ x64 and the Visual C++ Redistributable, which MSIX and most installers bundle.
 
+## Installers with GitHub Actions (manual)
+
+Two workflows build installers on GitHub's machines. They **never run on push**; start them from **Actions → workflow → Run workflow**.
+
+| Workflow | Runner | Output (artifact) | Install experience |
+| --- | --- | --- | --- |
+| `Build macOS (DMG)` | macOS 15 | `Vesper-<version>-macOS.dmg` | Open the DMG and drag Vesper onto Applications |
+| `Build Windows (Installer)` | Windows | `Vesper-Setup-<version>.exe` | Setup wizard: install location, all users or just me, optional desktop shortcut, Start Menu entry, launch at finish; uninstall from Settings → Apps |
+
+Inputs: **Run tests** (analyze and test first, default on) and **Create release** (attach the file to a draft GitHub Release `v<version>`). Download the result from the run page under **Artifacts**.
+
+**Repository secrets** (Settings → Secrets and variables → Actions). GitHub does not allow secret names that start with `GITHUB_`, hence `OAUTH_`:
+
+| Secret | Value |
+| --- | --- |
+| `GOOGLE_CLIENT_ID` | Google Desktop client ID |
+| `GOOGLE_DESKTOP_CLIENT_SECRET` | Google Desktop client secret |
+| `OAUTH_GITHUB_CLIENT_ID` | GitHub OAuth App client ID |
+
+Without them the app still builds; sign-in just shows "not configured".
+
+The version comes from `version:` in `pubspec.yaml`. Packaging files: `scripts/macos/create_dmg.sh` (also works locally) and `windows/installer/vesper.iss` (Inno Setup). The Windows installer bundles the Visual C++ runtime DLLs, so no separate redistributable is needed. It upgrades in place (stable AppId) and leaves user data in `%APPDATA%` on uninstall.
+
+**Unsigned builds:** until code signing is set up, macOS shows "cannot be opened" (use System Settings → Privacy & Security → **Open Anyway**), and Windows SmartScreen shows "Windows protected your PC" (**More info → Run anyway**).
+
 ## macOS verification suites
 
 Release-like (AOT, profile mode) end-to-end runs against the real Keychain and the real database of `co.tdevs.vesper`.

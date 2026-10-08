@@ -1,0 +1,83 @@
+name: Build macOS (DMG)
+
+# Runs only when started manually: Actions → "Build macOS (DMG)" → Run workflow.
+on:
+  workflow_dispatch:
+    inputs:
+      run_tests:
+        description: Run flutter analyze and flutter test before building
+        type: boolean
+        default: true
+      create_release:
+        description: Attach the DMG to a draft GitHub Release (v<version>)
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.44.8
+          cache: true
+
+      # OAuth client IDs come from repository secrets (Settings → Secrets and
+      # variables → Actions). Missing secrets just leave sign-in unconfigured.
+      - name: Write build configuration (.env)
+        env:
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_DESKTOP_CLIENT_SECRET: ${{ secrets.GOOGLE_DESKTOP_CLIENT_SECRET }}
+          OAUTH_GITHUB_CLIENT_ID: ${{ secrets.OAUTH_GITHUB_CLIENT_ID }}
+        run: |
+          {
+            echo "GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}"
+            echo "GOOGLE_DESKTOP_CLIENT_SECRET=${GOOGLE_DESKTOP_CLIENT_SECRET}"
+            echo "AUTH_BACKEND_URL="
+            echo "GITHUB_CLIENT_ID=${OAUTH_GITHUB_CLIENT_ID}"
+            echo "GITHUB_SCOPES=read:user repo"
+            echo "API_BASE_URL="
+          } > .env
+
+      - run: flutter pub get
+
+      - name: Analyze and test
+        if: ${{ inputs.run_tests }}
+        run: |
+          flutter analyze
+          flutter test
+
+      - name: Build release app
+        run: flutter build macos --release --dart-define-from-file=.env
+
+      - name: Read version
+        id: version
+        run: echo "value=$(sed -n 's/^version:[[:space:]]*\([^+[:space:]]*\).*/\1/p' pubspec.yaml)" >> "$GITHUB_OUTPUT"
+
+      - name: Create DMG
+        run: |
+          brew install create-dmg || echo "create-dmg unavailable; using hdiutil"
+          bash scripts/macos/create_dmg.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Vesper-${{ steps.version.outputs.value }}-macOS
+          path: dist/Vesper-*-macOS.dmg
+          if-no-files-found: error
+
+      - name: Attach to draft release
+        if: ${{ inputs.create_release }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: v${{ steps.version.outputs.value }}
+        run: |
+          gh release view "$TAG" >/dev/null 2>&1 || \
+            gh release create "$TAG" --draft --title "Vesper ${TAG#v}" --notes "Vesper ${TAG#v}"
+          gh release upload "$TAG" dist/Vesper-*-macOS.dmg --clobber
