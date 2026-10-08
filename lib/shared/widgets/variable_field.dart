@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../features/environments/presentation/environment_providers.dart';
+import 'variable_autocomplete.dart';
 import 'variable_text_controller.dart';
 
 /// Single or multi-line text field with `{{variable}}` highlighting. It owns
@@ -46,6 +47,9 @@ class VariableField extends ConsumerStatefulWidget {
 
 class _VariableFieldState extends ConsumerState<VariableField> {
   late final VariableTextController _controller;
+  FocusNode? _ownFocus;
+
+  FocusNode get _focus => widget.focusNode ?? (_ownFocus ??= FocusNode());
 
   @override
   void initState() {
@@ -73,6 +77,7 @@ class _VariableFieldState extends ConsumerState<VariableField> {
 
   @override
   void dispose() {
+    _ownFocus?.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -90,9 +95,9 @@ class _VariableFieldState extends ConsumerState<VariableField> {
         ? AppTheme.mono(context, size: 12.5)
         : TextStyle(fontSize: 13, color: colors.textPrimary);
 
-    return TextField(
+    final field = TextField(
       controller: _controller,
-      focusNode: widget.focusNode,
+      focusNode: _focus,
       autofocus: widget.autofocus,
       enabled: widget.enabled,
       onChanged: widget.onChanged,
@@ -113,6 +118,12 @@ class _VariableFieldState extends ConsumerState<VariableField> {
             ? const EdgeInsets.symmetric(horizontal: 8, vertical: 8)
             : null,
       ),
+    );
+    return VariableAutocomplete(
+      controller: _controller,
+      focusNode: _focus,
+      onChanged: widget.onChanged,
+      child: field,
     );
   }
 }
