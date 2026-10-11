@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/app_providers.dart';
@@ -41,7 +43,17 @@ final activeEnvironmentIdProvider = Provider<String?>(
 
 class ActiveWorkspace extends Notifier<String> {
   @override
-  String build() => ref.watch(initialWorkspaceIdProvider);
+  String build() {
+    // Falls back to the default workspace when the selected one disappears
+    // (deleted here or on another device).
+    ref.listen(workspacesProvider, (_, next) {
+      final all = next.value;
+      if (all != null && all.isNotEmpty && !all.any((w) => w.id == state)) {
+        unawaited(select(defaultWorkspaceId));
+      }
+    });
+    return ref.watch(initialWorkspaceIdProvider);
+  }
 
   WorkspaceRepository get _repo => ref.read(workspaceRepositoryProvider);
 

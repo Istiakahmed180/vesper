@@ -37,6 +37,7 @@ class VaultKeys {
       '${prefix}collection.$collectionId.';
   static const googleSession = '${prefix}auth.google.session';
   static const githubSession = '${prefix}auth.github.session';
+  static const cloudSession = '${prefix}auth.cloud.session';
 }
 
 class SecureStorageVault implements SecretVault {

@@ -222,7 +222,13 @@ void main() {
       vault,
     ).watchEnvironments().first;
     expect(envs.map((e) => e.name), ['Globals', 'Sandbox']);
+    expect(envs.first.id, globalsEnvironmentId(defaultWorkspaceId));
     final settings = SettingsRepository(legacy);
+    expect(
+      await settings.read(AppDatabase.pendingVaultRekeyKey),
+      contains('globals-default'),
+      reason: 'secret Globals values move in the vault at startup',
+    );
     expect(await settings.read('workspace'), isNull);
     expect(
       await settings.read(SettingsRepository.tabsKey(defaultWorkspaceId)),

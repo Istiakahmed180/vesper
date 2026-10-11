@@ -11,6 +11,8 @@ class AppConfig {
     required this.githubClientId,
     required this.githubScopes,
     required this.apiBaseUrl,
+    this.supabaseUrl = '',
+    this.supabaseAnonKey = '',
   });
 
   factory AppConfig.fromEnvironment() => const AppConfig(
@@ -25,6 +27,8 @@ class AppConfig {
       defaultValue: 'read:user repo',
     ),
     apiBaseUrl: String.fromEnvironment('API_BASE_URL'),
+    supabaseUrl: String.fromEnvironment('SUPABASE_URL'),
+    supabaseAnonKey: String.fromEnvironment('SUPABASE_ANON_KEY'),
   );
 
   /// OAuth client ID of a Google "Desktop app" client.
@@ -46,6 +50,16 @@ class AppConfig {
 
   /// Reserved for a future Vesper cloud backend.
   final String apiBaseUrl;
+
+  /// Supabase project used for account-based cloud sync.
+  final String supabaseUrl;
+
+  /// The project's public (anon / publishable) key. Row Level Security
+  /// limits every signed-in user to their own data.
+  final String supabaseAnonKey;
+
+  bool get isCloudConfigured =>
+      supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty;
 
   bool get isGoogleConfigured => googleClientId.isNotEmpty;
   bool get isGitHubConfigured => githubClientId.isNotEmpty;

@@ -14,6 +14,7 @@ import 'core/constants/app_constants.dart';
 import 'core/di/app_providers.dart';
 import 'core/logging/app_logger.dart';
 import 'core/storage/app_database.dart';
+import 'core/storage/vault_migration.dart';
 import 'features/history/data/drift_history_repository.dart';
 import 'features/settings/data/settings_repository.dart';
 import 'features/settings/presentation/settings_controller.dart';
@@ -108,6 +109,10 @@ Future<ProviderContainer> bootstrap({
     // repeat failing disk or network operations.
     retry: (_, _) => null,
   );
+  await migrateEnvironmentVaultKeys(
+    database,
+    container.read(vaultProvider),
+  ).catchError((Object e) => logger.warning('Vault key migration failed'));
   await container
       .read(workspaceProvider.notifier)
       .restore(settings.startupBehavior);

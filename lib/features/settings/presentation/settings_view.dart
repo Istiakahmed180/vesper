@@ -11,6 +11,7 @@ import '../../../core/storage/app_database.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/dialogs.dart';
 import '../../auth/presentation/account_card.dart';
+import '../../cloud_sync/presentation/cloud_sync_widgets.dart';
 import '../../collections/presentation/collection_providers.dart';
 import '../../environments/presentation/environment_providers.dart';
 import '../../github/presentation/github_card.dart';
@@ -628,6 +629,14 @@ class _AccountSettings extends StatelessWidget {
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
       _Group(title: 'Vesper account', children: [AccountCard()]),
+      _Group(
+        title: 'Cloud sync',
+        description:
+            'Workspaces, collections, environments and history follow your '
+            'Google account to every computer. Tokens, passwords and secret '
+            'values never leave this computer.',
+        children: [CloudSyncCard()],
+      ),
       _Group(
         title: 'GitHub',
         description:
