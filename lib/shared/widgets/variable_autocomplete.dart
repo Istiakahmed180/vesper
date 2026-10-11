@@ -8,6 +8,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../features/api_client/domain/services/variable_resolver.dart';
 import '../../features/environments/presentation/environment_providers.dart';
+import 'variable_scope.dart';
 
 /// An unfinished `{{name` the cursor is currently in.
 @immutable
@@ -57,7 +58,8 @@ class VariableSuggestion {
   final String preview;
 }
 
-/// Suggestions for [query] from the active environment and globals, best
+/// Suggestions for [query] from the active environment, the collection and
+/// globals, best
 /// matches first. Dynamic variables (`$guid`…) only appear for `{{$`.
 ///
 /// With [hideCredentials] (used by the URL bar), secret variables and names
@@ -77,9 +79,12 @@ List<VariableSuggestion> variableSuggestions(
     return v.value.length > 48 ? '${v.value.substring(0, 48)}…' : v.value;
   }
 
-  // Globals first so environment values (which win at runtime) replace them.
+  // Lowest priority first so the scope that wins at runtime replaces them.
   for (final e in resolver.globals.entries) {
     all[e.key] = VariableSuggestion(e.key, 'Globals', preview(e.value));
+  }
+  for (final e in resolver.collection.entries) {
+    all[e.key] = VariableSuggestion(e.key, 'Collection', preview(e.value));
   }
   for (final e in resolver.environment.entries) {
     all[e.key] = VariableSuggestion(
@@ -90,7 +95,7 @@ List<VariableSuggestion> variableSuggestions(
   }
   if (hideCredentials) {
     all.removeWhere((name, _) {
-      final value = resolver.environment[name] ?? resolver.globals[name];
+      final value = resolver.lookup(name);
       final credential =
           (value?.isSecret ?? false) || Redactor.isSensitiveKey(name);
       return credential && (q.isEmpty || !name.toLowerCase().startsWith(q));
@@ -219,7 +224,7 @@ class _VariableAutocompleteState extends ConsumerState<VariableAutocomplete> {
         ? const <VariableSuggestion>[]
         : variableSuggestions(
             token.query,
-            ref.read(variableResolverProvider),
+            VariableScope.read(ref, context),
             environmentName: ref.read(activeEnvironmentProvider)?.name,
             hideCredentials: widget.hideCredentials,
           );

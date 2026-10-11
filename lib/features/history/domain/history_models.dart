@@ -78,6 +78,7 @@ class HistorySanitizer {
         refreshToken: _clean(a.refreshToken),
       ),
       final NoAuth a => a,
+      final InheritAuth a => a,
     };
     final urlEncoded = [
       for (final f in request.body.urlEncoded)

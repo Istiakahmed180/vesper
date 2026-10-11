@@ -8,7 +8,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../shared/widgets/dialogs.dart';
 import '../../../../shared/widgets/section_tabs.dart';
-import '../../../environments/presentation/environment_providers.dart';
+import '../../../../shared/widgets/variable_scope.dart';
 import '../../../settings/presentation/settings_controller.dart';
 import '../../../workspace/presentation/workspace_controller.dart';
 import '../../data/cookie_store.dart';
@@ -38,7 +38,7 @@ class _CookiesViewState extends ConsumerState<CookiesView> {
           requestTabProvider(widget.tabId).select((t) => t?.draft.url),
         ) ??
         '';
-    final resolver = ref.watch(variableResolverProvider);
+    final resolver = VariableScope.watch(ref, context);
     final resolved = resolver(UrlParts.split(url).base);
     final uri = Uri.tryParse(
       UrlUtils.hasScheme(resolved) ? resolved : 'http://$resolved',

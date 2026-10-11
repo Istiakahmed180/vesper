@@ -6,6 +6,7 @@
 | --- | --- | --- |
 | Request auth (bearer token, basic password, API key value, OAuth client secret / tokens) | OS vault | SQLite, logs, history, default exports, GitHub |
 | Secret environment variables | OS vault | SQLite (empty value), logs, history, default exports |
+| Collection auth secrets and secret collection variables | OS vault | SQLite, logs, history, default exports, GitHub |
 | Google / GitHub sessions | OS vault | SQLite, logs |
 
 The OS vault is `flutter_secure_storage`: macOS Keychain, or Windows Credential Manager with DPAPI encryption.

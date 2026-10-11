@@ -38,17 +38,32 @@ Future<void> clearHistoryCommand(BuildContext context, WidgetRef ref) async {
 void openHistoryEntry(WidgetRef ref, HistoryEntry entry, {bool run = false}) {
   final request = entry.request;
   final missingSecrets =
-      (request.auth is! NoAuth && request.auth.secrets.isEmpty) ||
+      (request.auth is! NoAuth &&
+          request.auth is! InheritAuth &&
+          request.auth.secrets.isEmpty) ||
       request.headers.any(
         (h) =>
             h.enabled && h.value.isEmpty && Redactor.isSensitiveHeader(h.key),
       );
   final path = displayPath(request.url);
+  // Snapshots don't record the collection; an inheriting request gets it
+  // back from its saved request so it sends the collection's auth again.
+  final savedId = entry.requestId;
+  final collectionId = request.auth is InheritAuth && savedId != null
+      ? ref
+            .read(collectionTreesProvider)
+            .value
+            ?.where((t) => t.allRequests.any((r) => r.id == savedId))
+            .firstOrNull
+            ?.collection
+            .id
+      : null;
   final tabId = ref
       .read(workspaceProvider.notifier)
       .newRequestTab(
         request.copyWith(
           name: '${request.method.value} ${path.isEmpty ? request.url : path}',
+          collectionId: () => collectionId,
         ),
         missingSecrets
             ? 'Credentials are not stored in history. Re-enter them (or use {{variables}}) before sending.'

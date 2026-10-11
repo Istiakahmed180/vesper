@@ -13,10 +13,12 @@ It's a Postman alternative with its own design, code and assets. It can import P
 | Authorization | Bearer, Basic, API key (header or query), OAuth 2.0 (Authorization Code + PKCE via loopback, Client Credentials, refresh) |
 | Responses | Status, time, size; virtualized Pretty/Raw viewer with syntax highlighting, collapsible JSON/XML blocks, search, copy, save to file; image preview; open HTML in the browser; headers, cookies and redirect details |
 | Workspaces | Separate workspaces (e.g. per project or client), each with its own collections, environments, Globals, history, open tabs and GitHub sync target; switch from the sidebar header, move collections between workspaces |
+| Collection auth & variables | Each collection has its own authorization (any auth type) and variables; requests choose **Inherit auth from parent** (the default for new requests) to use it. Variables rank environment → collection → Globals. Postman collection/folder auth and collection variables are imported |
 | Collections | Collections → nested folders → requests; create, rename, duplicate, delete (with confirmation), drag-and-drop move and reorder, search |
 | Environments | Globals + environments, `{{variables}}` in URL/headers/body/auth, nested variables, `{{$guid}}`/`{{$timestamp}}`/`{{$isoTimestamp}}`/`{{$randomInt}}`, secret variables kept in the keychain, live variable preview |
 | History | Every sent request (sanitized: no secrets), grouped by day, re-run, delete, clear, configurable retention |
 | cURL | Paste a cURL command into the URL bar or use **Import cURL**; **Copy as cURL** for any request |
+| Code snippets | **</>** next to Save: the request as cURL, raw HTTP, JavaScript (fetch), Node.js (Axios), Python (requests), Dart (http, Dio), Go, PHP, Swift, Java (OkHttp), C# (HttpClient) or PowerShell, with variables resolved and auth applied |
 | Import / export | Versioned Vesper JSON format; Postman Collection v2.0/2.1 and Postman environments; secrets are excluded unless you opt in |
 | Accounts | Sign in with Google (PKCE, optional backend exchange); GitHub connection via Device Flow |
 | GitHub sync | Push and pull collections as JSON files in a repository you choose, with three-way conflict detection and an explicit confirmation for every write |

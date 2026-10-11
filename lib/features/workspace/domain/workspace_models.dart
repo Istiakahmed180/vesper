@@ -67,6 +67,35 @@ class EnvironmentTab extends WorkspaceTab {
   bool get isDirty => false;
 }
 
+/// Which part of the collection editor a [CollectionTab] shows.
+enum CollectionSection { authorization, variables }
+
+class CollectionTab extends WorkspaceTab {
+  CollectionTab({
+    super.id,
+    required this.collectionId,
+    required this.name,
+    this.section = CollectionSection.authorization,
+  });
+
+  final String collectionId;
+  final String name;
+  final CollectionSection section;
+
+  @override
+  String get title => name;
+
+  @override
+  bool get isDirty => false;
+
+  CollectionTab copyWith({CollectionSection? section}) => CollectionTab(
+    id: id,
+    collectionId: collectionId,
+    name: name,
+    section: section ?? this.section,
+  );
+}
+
 @immutable
 class WorkspaceState {
   const WorkspaceState({this.tabs = const [], this.activeTabId});

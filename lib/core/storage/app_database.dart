@@ -33,6 +33,12 @@ class Collections extends Table {
       text().withDefault(const Constant(defaultWorkspaceId))();
   TextColumn get name => text()();
   TextColumn get description => text().withDefault(const Constant(''))();
+
+  /// Collection authorization without secrets (those are in the vault).
+  TextColumn get authJson => text().withDefault(const Constant('{}'))();
+
+  /// Collection variables; secret values are empty here (kept in the vault).
+  TextColumn get variablesJson => text().withDefault(const Constant('[]'))();
   IntColumn get sortOrder => integer().withDefault(const Constant(0))();
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get updatedAt => dateTime()();
@@ -186,7 +192,7 @@ class AppDatabase extends _$AppDatabase {
 
   /// Bump when the schema changes and add a step in [migration].
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -197,6 +203,10 @@ class AppDatabase extends _$AppDatabase {
     onUpgrade: (m, from, to) async {
       // Migrations run sequentially: add `if (from < N) { ... }` blocks here.
       if (from < 2) await _migrateToWorkspaces(m);
+      if (from < 3) {
+        await m.addColumn(collections, collections.authJson);
+        await m.addColumn(collections, collections.variablesJson);
+      }
     },
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = ON');

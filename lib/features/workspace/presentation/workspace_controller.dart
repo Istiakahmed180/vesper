@@ -6,6 +6,7 @@ import '../../../core/di/app_providers.dart';
 import '../../../core/utils/json_read.dart';
 import '../../api_client/domain/models/api_request.dart';
 import '../../api_client/domain/models/key_value.dart';
+import '../../api_client/domain/models/request_auth.dart';
 import '../../api_client/domain/services/url_utils.dart';
 import '../../collections/domain/collection_models.dart';
 import '../../collections/presentation/collection_providers.dart';
@@ -54,7 +55,7 @@ class WorkspaceController extends Notifier<WorkspaceState> {
   }
 
   static WorkspaceState _blankState() {
-    final first = RequestTab(draft: ApiRequest());
+    final first = RequestTab(draft: _newRequest());
     return WorkspaceState(tabs: [first], activeTabId: first.id);
   }
 
@@ -86,7 +87,7 @@ class WorkspaceController extends Notifier<WorkspaceState> {
 
   String newRequestTab([ApiRequest? request, String? notice]) {
     final tab = RequestTab(
-      draft: _syncParams(request ?? ApiRequest()),
+      draft: _syncParams(request ?? _newRequest()),
       notice: notice,
     );
     final index = _activeIndex + 1;
@@ -131,6 +132,36 @@ class WorkspaceController extends Notifier<WorkspaceState> {
     _set(WorkspaceState(tabs: tabs, activeTabId: tab.id));
   }
 
+  /// Opens the authorization/variables editor of a collection.
+  void openCollection(
+    String collectionId,
+    String name, {
+    CollectionSection section = CollectionSection.authorization,
+  }) {
+    final existing = state.tabs
+        .whereType<CollectionTab>()
+        .where((t) => t.collectionId == collectionId)
+        .firstOrNull;
+    if (existing != null) {
+      _replaceTab(existing.id, existing.copyWith(section: section));
+      return activate(existing.id);
+    }
+    final tab = CollectionTab(
+      collectionId: collectionId,
+      name: name,
+      section: section,
+    );
+    final tabs = [...state.tabs]..insert(_activeIndex + 1, tab);
+    _set(WorkspaceState(tabs: tabs, activeTabId: tab.id));
+  }
+
+  void setCollectionSection(String tabId, CollectionSection section) {
+    final tab = state.tab(tabId);
+    if (tab is CollectionTab) {
+      _replaceTab(tabId, tab.copyWith(section: section));
+    }
+  }
+
   void closeTab(String tabId) {
     final index = state.tabs.indexWhere((t) => t.id == tabId);
     if (index == -1) return;
@@ -138,7 +169,7 @@ class WorkspaceController extends Notifier<WorkspaceState> {
     ref.read(responseProvider(tabId).notifier).cancel();
     ref.invalidate(responseProvider(tabId));
     if (tabs.isEmpty) {
-      final blank = RequestTab(draft: ApiRequest());
+      final blank = RequestTab(draft: _newRequest());
       _set(WorkspaceState(tabs: [blank], activeTabId: blank.id));
       return;
     }
@@ -320,6 +351,9 @@ class WorkspaceController extends Notifier<WorkspaceState> {
   }
 
   // ---------------------------------------------------------------- helpers
+
+  /// A blank request; once saved it uses its collection's authorization.
+  static ApiRequest _newRequest() => ApiRequest(auth: const InheritAuth());
 
   /// The params table mirrors the URL's query; requests stored or imported
   /// without one get it rebuilt so editing the table never drops the query.

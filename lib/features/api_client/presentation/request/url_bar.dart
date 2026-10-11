@@ -147,6 +147,12 @@ class _UrlBarState extends ConsumerState<UrlBar> {
               ),
             ),
           ),
+          IconButton(
+            key: const ValueKey('generate-code'),
+            tooltip: 'Code snippet',
+            onPressed: () => actions.generateCode(widget.tabId),
+            icon: const Icon(Icons.code),
+          ),
           MenuAnchor(
             builder: (context, controller, _) => IconButton(
               tooltip: 'More',
@@ -159,6 +165,11 @@ class _UrlBarState extends ConsumerState<UrlBar> {
                 leadingIcon: const Icon(Icons.save_as_outlined, size: 16),
                 onPressed: () => actions.save(widget.tabId, true),
                 child: const Text('Save as…'),
+              ),
+              MenuItemButton(
+                leadingIcon: const Icon(Icons.code, size: 16),
+                onPressed: () => actions.generateCode(widget.tabId),
+                child: const Text('Code snippet…'),
               ),
               MenuItemButton(
                 leadingIcon: const Icon(Icons.terminal, size: 16),

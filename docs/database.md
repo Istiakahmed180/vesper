@@ -6,12 +6,12 @@ Vesper stores local data in SQLite through [Drift](https://drift.simonbinder.eu/
 
 Schema: `lib/core/storage/app_database.dart`. Generated code: `app_database.g.dart`, regenerated with `dart run build_runner build`. Dates are stored as ISO-8601 text, and foreign keys are enforced (`PRAGMA foreign_keys = ON`).
 
-## Tables (schema v2)
+## Tables (schema v3)
 
 | Table | Purpose | Notes |
 | --- | --- | --- |
 | `workspaces` | Workspaces | The `default` row ("My Workspace") always exists and cannot be deleted. `active_environment_id` is the environment selected in that workspace |
-| `collections` | Collections | `workspace_id`; `sort_order` for manual ordering within the workspace |
+| `collections` | Collections | `workspace_id`; `sort_order` for manual ordering within the workspace; `auth_json` (collection auth without secrets) and `variables_json` (secret values empty) |
 | `folders` | Nested folders | `collection_id` and `parent_id` cascade on delete |
 | `requests` | Saved requests | Params/headers/body/auth/options as typed JSON columns. **Auth secrets are not stored here.** |
 | `environments` | Environments and one `is_global` Globals row per workspace | `workspace_id` |
@@ -34,6 +34,8 @@ Secret fields are written to the OS vault under deterministic keys and deleted t
 | --- | --- |
 | `vesper.request.<id>.auth.<field>` | token / password / value / clientSecret / accessToken / refreshToken |
 | `vesper.env.<envId>.var.<varId>` | Secret variable value |
+| `vesper.collection.<id>.auth.<field>` | Collection auth secret (same fields as request auth) |
+| `vesper.collection.<id>.var.<varId>` | Secret collection variable value |
 | `vesper.auth.google.session` | Google session JSON |
 | `vesper.auth.github.session` | GitHub session JSON |
 
@@ -53,6 +55,8 @@ Secret fields are written to the OS vault under deterministic keys and deleted t
 Steps run in order, so a user upgrading from v1 to v4 runs every step.
 
 **v1 → v2 (workspaces):** creates `workspaces` with the default row, adds `workspace_id` (default `'default'`) to collections, environments and history, moves the active environment from `app_settings` onto the default workspace, and renames the `workspace` and `github.sync_target` settings keys to their per-workspace form. Covered by `test/data/workspaces_test.dart`.
+
+**v2 → v3 (collection settings):** adds `auth_json` (`'{}'`) and `variables_json` (`'[]'`) to `collections`.
 
 ## Streams
 

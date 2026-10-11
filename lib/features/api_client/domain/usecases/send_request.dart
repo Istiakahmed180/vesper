@@ -5,6 +5,7 @@ import '../../../history/domain/history_repository.dart';
 import '../../../settings/domain/app_settings.dart';
 import '../models/api_request.dart';
 import '../models/api_response.dart';
+import '../models/request_auth.dart';
 import '../repositories/http_client_port.dart';
 import '../services/request_preparer.dart';
 import '../services/variable_resolver.dart';
@@ -25,6 +26,7 @@ class SendRequestUseCase {
     ApiRequest request, {
     required VariableResolver resolver,
     required AppSettings settings,
+    RequestAuth? inheritedAuth,
     String? savedRequestId,
     CancelHandle? cancel,
   }) async {
@@ -32,6 +34,7 @@ class SendRequestUseCase {
     final prepared = preparer.prepare(
       request,
       resolver,
+      inheritedAuth: inheritedAuth,
       defaults: RequestDefaults(
         timeoutMs: network.timeoutMs,
         followRedirects: network.followRedirects,

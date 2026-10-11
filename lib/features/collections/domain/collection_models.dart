@@ -1,7 +1,11 @@
+import 'package:collection/collection.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../../core/utils/id.dart';
 import '../../api_client/domain/models/api_request.dart';
+import '../../api_client/domain/models/request_auth.dart';
+import '../../api_client/domain/services/variable_resolver.dart';
+import '../../environments/domain/environment_models.dart';
 
 @immutable
 class Collection {
@@ -36,6 +40,53 @@ class Collection {
     createdAt: createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
+}
+
+/// Authorization and variables shared by every request in a collection.
+/// Requests use [auth] when set to "Inherit auth from parent"; [variables]
+/// rank between the active environment and the Globals.
+@immutable
+class CollectionSettings {
+  const CollectionSettings({
+    this.auth = const NoAuth(),
+    this.variables = const [],
+  });
+
+  /// Never [InheritAuth]: a collection has no parent.
+  final RequestAuth auth;
+  final List<EnvVariable> variables;
+
+  bool get isEmpty =>
+      auth is NoAuth && variables.every((v) => v.key.trim().isEmpty);
+
+  CollectionSettings copyWith({
+    RequestAuth? auth,
+    List<EnvVariable>? variables,
+  }) => CollectionSettings(
+    auth: auth ?? this.auth,
+    variables: variables ?? this.variables,
+  );
+
+  Map<String, VariableValue> toScope() => {
+    for (final v in variables)
+      if (v.isActive)
+        v.key.trim(): VariableValue(
+          v.value,
+          VariableSource.collection,
+          isSecret: v.isSecret,
+        ),
+  };
+
+  static const _eq = ListEquality<EnvVariable>();
+
+  @override
+  bool operator ==(Object other) =>
+      other is CollectionSettings &&
+      other.auth == auth &&
+      _eq.equals(other.variables, variables);
+
+  @override
+  int get hashCode => Object.hash(auth, _eq.hash(variables));
 }
 
 @immutable

@@ -7,6 +7,7 @@ import '../../api_client/domain/models/key_value.dart';
 import '../../api_client/domain/models/request_auth.dart';
 import '../../api_client/domain/models/request_body.dart';
 import '../../api_client/domain/services/url_utils.dart';
+import '../../collections/domain/collection_models.dart';
 import '../../collections/domain/collection_repository.dart';
 import '../../environments/domain/environment_models.dart';
 import 'collection_codec.dart';
@@ -38,43 +39,71 @@ class PostmanCollectionImporter implements CollectionImporter {
     final info = json.obj('info');
     scripts += json.list('event').length;
 
-    List<CollectionItem> items(List<JsonMap> raw, int depth) {
+    // Vesper has no folder-level auth, so a folder's auth is copied onto the
+    // requests below it that inherit; [folderAuth] is null when they inherit
+    // from the collection.
+    List<CollectionItem> items(
+      List<JsonMap> raw,
+      int depth,
+      RequestAuth? folderAuth,
+    ) {
       final out = <CollectionItem>[];
       for (final item in raw) {
         counter.item(depth);
         scripts += item.list('event').length;
         final name = counter.text(item['name'], fallback: 'Untitled');
         if (item['item'] is List) {
-          out.add(FolderItem(name, items(item.objList('item'), depth + 1)));
+          final own = item['auth'] is Map
+              ? _auth(item.obj('auth'), warnings)
+              : null;
+          out.add(
+            FolderItem(
+              name,
+              items(item.objList('item'), depth + 1, own ?? folderAuth),
+            ),
+          );
         } else if (item['request'] != null) {
-          out.add(RequestItem(_request(item, name, counter, warnings)));
+          final request = _request(item, name, counter, warnings);
+          out.add(
+            RequestItem(
+              request.auth is InheritAuth && folderAuth != null
+                  ? request.copyWith(auth: folderAuth)
+                  : request,
+            ),
+          );
         }
       }
       return out;
     }
 
-    final docItems = items(json.objList('item'), 1);
+    final docItems = items(json.objList('item'), 1, null);
     if (scripts > 0) {
       warnings.add(
         '$scripts script(s) were ignored; Vesper never runs imported scripts.',
       );
     }
-    if (json.list('variable').isNotEmpty) {
-      warnings.add(
-        'Collection variables were not imported; add them to an environment instead.',
-      );
-    }
-    if (json['auth'] is Map) {
-      warnings.add(
-        'Collection-level authorization was not imported; set auth on each request.',
-      );
-    }
+    final collectionAuth = json['auth'] is Map
+        ? _auth(json.obj('auth'), warnings)
+        : null;
+    final variables = [
+      for (final v in json.objList('variable'))
+        EnvVariable(
+          key: counter.text(v['key']),
+          value: counter.text(v['value']),
+          enabled: !v.boolean('disabled'),
+          isSecret: v.str('type') == 'secret',
+        ),
+    ];
 
     return ImportResult(
       CollectionDocument(
         name: counter.text(info['name'], fallback: 'Imported collection'),
         description: _description(info['description']),
         items: docItems,
+        settings: CollectionSettings(
+          auth: collectionAuth ?? const NoAuth(),
+          variables: variables,
+        ),
       ),
       warnings: warnings,
       source: name,
@@ -113,7 +142,10 @@ class PostmanCollectionImporter implements CollectionImporter {
       params: UrlUtils.paramsFromUrl(url, const []),
       headers: headers,
       body: _body(req.objOrNull('body'), counter, warnings),
-      auth: _auth(req.objOrNull('auth'), warnings),
+      // Postman requests without an auth block inherit from their parent.
+      auth: req['auth'] is Map
+          ? _auth(req.obj('auth'), warnings) ?? const InheritAuth()
+          : const InheritAuth(),
       description: _description(req['description']),
     );
   }
@@ -215,8 +247,8 @@ class PostmanCollectionImporter implements CollectionImporter {
     }
   }
 
-  RequestAuth _auth(JsonMap? auth, List<String> warnings) {
-    if (auth == null) return const NoAuth();
+  /// Null for `inherit`.
+  RequestAuth? _auth(JsonMap auth, List<String> warnings) {
     String field(String type, String key) {
       final entries = auth[type];
       if (entries is List) {
@@ -257,6 +289,8 @@ class PostmanCollectionImporter implements CollectionImporter {
               ? OAuth2GrantType.clientCredentials
               : OAuth2GrantType.authorizationCode,
         );
+      case 'inherit':
+        return null;
       case 'noauth' || '':
         return const NoAuth();
       default:

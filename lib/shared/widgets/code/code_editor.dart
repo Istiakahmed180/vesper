@@ -8,8 +8,8 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../features/api_client/domain/services/variable_resolver.dart';
 import '../../../features/api_client/presentation/response/body_formatter.dart';
-import '../../../features/environments/presentation/environment_providers.dart';
 import '../variable_autocomplete.dart';
+import '../variable_scope.dart';
 import 'syntax_highlighter.dart';
 
 /// Controller that syntax-highlights its text and colours `{{variables}}`.
@@ -136,7 +136,7 @@ class _CodeEditorState extends ConsumerState<CodeEditor> {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final resolver = ref.watch(variableResolverProvider);
+    final resolver = VariableScope.watch(ref, context);
     _controller
       ..language = widget.language
       ..colors = colors
