@@ -209,6 +209,8 @@ class CloudSyncController extends Notifier<CloudSyncState> {
 
   void _start() {
     _stopListening();
+    // Leaves "connecting" so [syncNow] runs.
+    state = state.copyWith(CloudSyncPhase.syncing);
     final db = ref.read(databaseProvider);
     _subscriptions
       ..add(

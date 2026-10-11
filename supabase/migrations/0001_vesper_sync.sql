@@ -25,6 +25,11 @@ create index if not exists sync_items_user_server_updated
 
 alter table public.sync_items enable row level security;
 
+-- Only signed-in users reach the table through the Data API (works whether or
+-- not "Automatically expose new tables" was enabled for the project).
+revoke all on public.sync_items from anon;
+grant select, insert, update, delete on public.sync_items to authenticated;
+
 drop policy if exists "Users read their own items" on public.sync_items;
 create policy "Users read their own items" on public.sync_items
   for select to authenticated using ((select auth.uid()) = user_id);
