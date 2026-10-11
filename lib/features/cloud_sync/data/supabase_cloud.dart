@@ -323,13 +323,19 @@ class SupabaseCloudStore implements CloudStore {
     return [for (final row in rows) '${row['email']}'];
   }
 
-  Future<void> invite(String workspaceId, String email) => _guard(
-    () => client.from('workspace_invites').upsert({
-      'workspace_id': workspaceId,
-      'email': email.trim().toLowerCase(),
-      'invited_by': _userId,
-    }, onConflict: 'workspace_id,email'),
-  );
+  /// Invites [email]; inviting the same address again is not an error.
+  Future<void> invite(String workspaceId, String email) async {
+    try {
+      await client.from('workspace_invites').insert({
+        'workspace_id': workspaceId,
+        'email': email.trim().toLowerCase(),
+        'invited_by': _userId,
+      });
+    } on PostgrestException catch (e) {
+      if (e.code == '23505') return; // already invited
+      await _guard(() => Future<void>.error(e));
+    }
+  }
 
   Future<void> cancelInvite(String workspaceId, String email) => _guard(
     () => client
