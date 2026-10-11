@@ -6,6 +6,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/id.dart';
 import '../../features/api_client/domain/models/key_value.dart';
 import 'all_rows_checkbox.dart';
+import 'dialogs.dart';
 import 'variable_autocomplete.dart';
 import 'variable_field.dart';
 
@@ -112,6 +113,23 @@ class _KeyValueEditorState extends State<KeyValueEditor> {
                 style: Theme.of(context).textTheme.labelSmall,
               ),
               const Spacer(),
+              if (widget.rows.isNotEmpty)
+                TextButton.icon(
+                  key: const ValueKey('clear-rows'),
+                  onPressed: () async {
+                    final ok = await confirmDialog(
+                      context,
+                      title: 'Clear all',
+                      message:
+                          'Remove all ${widget.rows.length} '
+                          '${widget.keyHint.toLowerCase()} row(s)?',
+                      confirmLabel: 'Clear',
+                    );
+                    if (ok) widget.onChanged(const []);
+                  },
+                  icon: const Icon(Icons.clear_all, size: 15),
+                  label: const Text('Clear'),
+                ),
               TextButton.icon(
                 onPressed: () => setState(() => _bulk = !_bulk),
                 icon: Icon(

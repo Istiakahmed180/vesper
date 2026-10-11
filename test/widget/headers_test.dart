@@ -146,5 +146,13 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('all-rows-checkbox')));
     await tester.pumpAndSettle();
     expect(rows.every((r) => r.enabled), isTrue);
+
+    // Clear removes every row after confirming.
+    await tester.tap(find.byKey(const ValueKey('clear-rows')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Clear'));
+    await tester.pumpAndSettle();
+    expect(rows, isEmpty);
+    expect(find.byKey(const ValueKey('clear-rows')), findsNothing);
   }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
 }

@@ -317,6 +317,28 @@ class _FormDataEditorState extends State<_FormDataEditor> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (widget.fields.isNotEmpty)
+          Align(
+            alignment: Alignment.centerRight,
+            child: Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: TextButton.icon(
+                key: const ValueKey('clear-form-data'),
+                onPressed: () async {
+                  final ok = await confirmDialog(
+                    context,
+                    title: 'Clear all',
+                    message:
+                        'Remove all ${widget.fields.length} form field(s)?',
+                    confirmLabel: 'Clear',
+                  );
+                  if (ok) widget.onChanged(const []);
+                },
+                icon: const Icon(Icons.clear_all, size: 15),
+                label: const Text('Clear'),
+              ),
+            ),
+          ),
         Container(
           height: 28,
           margin: const EdgeInsets.only(top: 8),
