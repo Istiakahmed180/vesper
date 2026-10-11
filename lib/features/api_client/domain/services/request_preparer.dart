@@ -90,13 +90,18 @@ class RequestPreparer {
       FileBody(:final contentType) => contentType,
       _ => null,
     };
-    if (contentType != null && !_has(headers, 'content-type')) {
+    final disabled = request.options.disabledDefaultHeaders;
+    if (contentType != null &&
+        !_has(headers, 'content-type') &&
+        !disabled.contains('content-type')) {
       headers.add(MapEntry('Content-Type', contentType));
     }
-    if (!_has(headers, 'user-agent') && defaults.userAgent.isNotEmpty) {
+    if (!_has(headers, 'user-agent') &&
+        defaults.userAgent.isNotEmpty &&
+        !disabled.contains('user-agent')) {
       headers.add(MapEntry('User-Agent', defaults.userAgent));
     }
-    if (!_has(headers, 'accept')) {
+    if (!_has(headers, 'accept') && !disabled.contains('accept')) {
       headers.add(const MapEntry('Accept', '*/*'));
     }
 

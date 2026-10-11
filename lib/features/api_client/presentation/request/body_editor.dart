@@ -10,6 +10,7 @@ import 'package:path/path.dart' as p;
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../core/utils/id.dart';
+import '../../../../shared/widgets/all_rows_checkbox.dart';
 import '../../../../shared/widgets/code/code_editor.dart';
 import '../../../../shared/widgets/dialogs.dart';
 import '../../../../shared/widgets/key_value_editor.dart';
@@ -327,7 +328,16 @@ class _FormDataEditorState extends State<_FormDataEditor> {
           ),
           child: Row(
             children: [
-              const SizedBox(width: 40),
+              SizedBox(
+                width: 40,
+                child: AllRowsCheckbox(
+                  total: widget.fields.length,
+                  enabled: widget.fields.where((f) => f.enabled).length,
+                  onChanged: (on) => widget.onChanged([
+                    for (final f in widget.fields) f.copyWith(enabled: on),
+                  ]),
+                ),
+              ),
               Expanded(
                 flex: 2,
                 child: Text(
