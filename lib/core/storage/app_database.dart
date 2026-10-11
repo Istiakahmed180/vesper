@@ -165,6 +165,34 @@ class SyncStates extends Table {
   Set<Column<Object>> get primaryKey => {itemKey, remote};
 }
 
+/// Local changes waiting to be uploaded to the cloud, filled by triggers on
+/// the synced tables. One row per item; [changedAt] is the latest change.
+@DataClassName('OutboxRow')
+class SyncOutbox extends Table {
+  TextColumn get kind => text()();
+  TextColumn get itemId => text()();
+
+  /// UTC ISO-8601 time of the latest local change.
+  TextColumn get changedAt => text()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {kind, itemId};
+}
+
+/// While a row exists here the change-tracking triggers are silent (used when
+/// applying cloud changes and when wiping the database).
+@DataClassName('SyncFlagRow')
+class SyncFlags extends Table {
+  TextColumn get name => text()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {name};
+}
+
+/// Id of a workspace's Globals environment. Deterministic so the same
+/// workspace has one Globals on every device.
+String globalsEnvironmentId(String workspaceId) => 'globals-$workspaceId';
+
 @DriftDatabase(
   tables: [
     Workspaces,
@@ -176,6 +204,8 @@ class SyncStates extends Table {
     HistoryEntries,
     SettingsEntries,
     SyncStates,
+    SyncOutbox,
+    SyncFlags,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -192,13 +222,14 @@ class AppDatabase extends _$AppDatabase {
 
   /// Bump when the schema changes and add a step in [migration].
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (m) async {
       await m.createAll();
       await _createIndexes();
+      await _createChangeTriggers();
     },
     onUpgrade: (m, from, to) async {
       // Migrations run sequentially: add `if (from < N) { ... }` blocks here.
@@ -207,6 +238,7 @@ class AppDatabase extends _$AppDatabase {
         await m.addColumn(collections, collections.authJson);
         await m.addColumn(collections, collections.variablesJson);
       }
+      if (from < 4) await _migrateToCloudSync(m);
     },
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = ON');
@@ -251,6 +283,94 @@ class AppDatabase extends _$AppDatabase {
     }
   }
 
+  /// v4: change tracking for cloud sync, and deterministic Globals ids.
+  Future<void> _migrateToCloudSync(Migrator m) async {
+    await m.createTable(syncOutbox);
+    await m.createTable(syncFlags);
+    final globals = await customSelect(
+      'SELECT id, workspace_id FROM environments WHERE is_global = 1',
+    ).get();
+    final rekey = <String, String>{};
+    for (final row in globals) {
+      final oldId = row.read<String>('id');
+      final newId = globalsEnvironmentId(row.read<String>('workspace_id'));
+      if (oldId == newId) continue;
+      rekey[oldId] = newId;
+      // env_variables reference environments(id): copy, repoint, delete.
+      await customStatement(
+        'INSERT INTO environments (id, workspace_id, name, is_global, sort_order, created_at, updated_at) '
+        'SELECT ?, workspace_id, name, is_global, sort_order, created_at, updated_at FROM environments WHERE id = ?',
+        [newId, oldId],
+      );
+      await customStatement(
+        'UPDATE env_variables SET environment_id = ? WHERE environment_id = ?',
+        [newId, oldId],
+      );
+      await customStatement('DELETE FROM environments WHERE id = ?', [oldId]);
+    }
+    if (rekey.isNotEmpty) {
+      // Secret values live in the vault under the old ids; moved at startup.
+      await customStatement(
+        'INSERT OR REPLACE INTO settings_entries (key, value) VALUES (?, ?)',
+        [pendingVaultRekeyKey, jsonEncode(rekey)],
+      );
+    }
+    await _createChangeTriggers();
+  }
+
+  /// Settings key holding environment ids whose vault secrets must move.
+  static const pendingVaultRekeyKey = 'migrate.environment_rekey';
+
+  /// Records every change to a synced table in [syncOutbox]. Rows created
+  /// automatically on each device (the default workspace and Globals) are
+  /// not recorded on insert, so a fresh device never overwrites cloud data.
+  Future<void> _createChangeTriggers() async {
+    const silent = 'NOT EXISTS (SELECT 1 FROM sync_flags)';
+    const now = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
+    final specs = [
+      ('workspaces', 'workspace', 'id', "NEW.id <> '$defaultWorkspaceId'"),
+      ('collections', 'collection', 'id', null),
+      ('folders', 'folder', 'id', null),
+      ('requests', 'request', 'id', null),
+      ('environments', 'environment', 'id', 'NEW.is_global = 0'),
+      ('env_variables', 'environment', 'environment_id', null),
+      ('history_entries', 'history', 'id', null),
+    ];
+    for (final (table, kind, idColumn, insertCondition) in specs) {
+      for (final (event, row) in [
+        ('INSERT', 'NEW'),
+        ('UPDATE', 'NEW'),
+        ('DELETE', 'OLD'),
+      ]) {
+        final condition = event == 'INSERT' && insertCondition != null
+            ? '$silent AND $insertCondition'
+            : silent;
+        await customStatement(
+          'CREATE TRIGGER IF NOT EXISTS sync_${table}_${event.toLowerCase()} '
+          'AFTER $event ON $table WHEN $condition BEGIN '
+          'INSERT INTO sync_outbox (kind, item_id, changed_at) '
+          "VALUES ('$kind', $row.$idColumn, $now) "
+          'ON CONFLICT (kind, item_id) DO UPDATE SET changed_at = excluded.changed_at; '
+          'END',
+        );
+      }
+    }
+  }
+
+  /// Runs [action] in a transaction without recording changes for sync.
+  Future<T> withoutChangeTracking<T>(Future<T> Function() action) =>
+      transaction(() async {
+        await into(syncFlags).insert(
+          const SyncFlagsCompanion(name: Value('applying')),
+          mode: InsertMode.insertOrReplace,
+        );
+        try {
+          return await action();
+        } finally {
+          await delete(syncFlags).go();
+        }
+      });
+
   Future<void> _ensureDefaultWorkspace() async {
     final now = DateTime.now();
     await into(workspaces).insert(
@@ -290,8 +410,29 @@ class AppDatabase extends _$AppDatabase {
 
   /// Deletes every row in every table (Settings → Clear local database),
   /// leaving an empty default workspace.
-  Future<void> wipe() => transaction(() async {
+  /// Deletes all workspaces, collections, environments and history but keeps
+  /// settings. Nothing is recorded for sync.
+  Future<void> wipeContent() => withoutChangeTracking(() async {
+    for (final TableInfo<Table, Object?> table in [
+      historyEntries,
+      envVariables,
+      environments,
+      requests,
+      folders,
+      collections,
+      workspaces,
+      syncStates,
+      syncOutbox,
+    ]) {
+      await delete(table).go();
+    }
+    await _ensureDefaultWorkspace();
+  });
+
+  /// Nothing is recorded for sync, so cloud data is left untouched.
+  Future<void> wipe() => withoutChangeTracking(() async {
     for (final table in allTables.toList().reversed) {
+      if (table == syncFlags) continue;
       await delete(table).go();
     }
     await _ensureDefaultWorkspace();

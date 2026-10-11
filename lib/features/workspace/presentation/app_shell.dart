@@ -11,6 +11,8 @@ import '../../../core/di/app_providers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/dialogs.dart';
 import '../../api_client/presentation/request/request_editor.dart';
+import '../../cloud_sync/presentation/cloud_sync_controller.dart';
+import '../../cloud_sync/presentation/cloud_sync_widgets.dart';
 import '../../collections/presentation/collection_editor.dart';
 import '../../environments/presentation/environment_editor.dart';
 import '../../environments/presentation/environment_providers.dart';
@@ -115,6 +117,17 @@ class _AppShellState extends ConsumerState<AppShell> with WindowListener {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final shell = ref.watch(shellProvider);
+    ref.listen(cloudSyncProvider.select((s) => s.phase), (previous, phase) {
+      if (phase == CloudSyncPhase.accountChanged &&
+          previous != CloudSyncPhase.accountChanged) {
+        unawaited(
+          showAccountChangedDialog(
+            context,
+            ref.read(cloudSyncProvider).previousAccount ?? 'another account',
+          ),
+        );
+      }
+    });
     final runner = CommandRunner(ref, context);
     final nativeMenus = ref.watch(nativeMenusProvider);
 
@@ -381,6 +394,7 @@ class _StatusBar extends ConsumerWidget {
           ),
           if (github != null)
             item(Icons.hub_outlined, '@${github.account.login}'),
+          const CloudSyncStatus(),
           const Spacer(),
           Text(
             '${AppConstants.appName} ${AppConstants.appVersion} · ${Platform.operatingSystem}',

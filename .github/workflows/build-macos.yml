@@ -36,6 +36,8 @@ jobs:
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_DESKTOP_CLIENT_SECRET: ${{ secrets.GOOGLE_DESKTOP_CLIENT_SECRET }}
           OAUTH_GITHUB_CLIENT_ID: ${{ secrets.OAUTH_GITHUB_CLIENT_ID }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
           {
             echo "GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}"
@@ -44,6 +46,8 @@ jobs:
             echo "GITHUB_CLIENT_ID=${OAUTH_GITHUB_CLIENT_ID}"
             echo "GITHUB_SCOPES=read:user repo"
             echo "API_BASE_URL="
+            echo "SUPABASE_URL=${SUPABASE_URL}"
+            echo "SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}"
           } > .env
 
       - run: flutter pub get

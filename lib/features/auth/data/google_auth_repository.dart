@@ -270,6 +270,27 @@ class GoogleAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<String?> currentIdToken() async {
+    final raw = await vault.read(VaultKeys.googleSession);
+    if (raw == null) return null;
+    final AuthSession stored;
+    try {
+      stored = AuthSession.fromJson(
+        (jsonDecode(raw) as Map).cast<String, Object?>(),
+      );
+    } catch (_) {
+      return null;
+    }
+    final idToken = stored.token.idToken;
+    if (idToken != null && !stored.token.isExpired) return idToken;
+    final refreshToken = stored.token.refreshToken;
+    if (refreshToken == null) return null;
+    final token = await exchanger.refresh(refreshToken);
+    await _store(AuthSession(account: stored.account, token: token));
+    return token.idToken;
+  }
+
+  @override
   Future<void> signOut() async {
     final raw = await vault.read(VaultKeys.googleSession);
     await vault.delete(VaultKeys.googleSession);

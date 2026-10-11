@@ -6,7 +6,7 @@ Vesper stores local data in SQLite through [Drift](https://drift.simonbinder.eu/
 
 Schema: `lib/core/storage/app_database.dart`. Generated code: `app_database.g.dart`, regenerated with `dart run build_runner build`. Dates are stored as ISO-8601 text, and foreign keys are enforced (`PRAGMA foreign_keys = ON`).
 
-## Tables (schema v3)
+## Tables (schema v4)
 
 | Table | Purpose | Notes |
 | --- | --- | --- |
@@ -18,7 +18,9 @@ Schema: `lib/core/storage/app_database.dart`. Generated code: `app_database.g.da
 | `env_variables` | Variables | `value` is empty for secret variables (stored in the vault) |
 | `history_entries` | Sent requests | `workspace_id`; sanitized request snapshot; response bodies are not stored |
 | `settings_entries` | Key/value settings | `app_settings`, `workspaces.active`, `workspace.tabs.<workspaceId>` (open tabs), `github.sync_target.<workspaceId>` |
-| `sync_states` | Last synced state per item and remote | Primary key `(item_key, remote)` |
+| `sync_states` | Last synced state per item and remote (GitHub sync) | Primary key `(item_key, remote)` |
+| `sync_outbox` | Local changes waiting for cloud sync, filled by triggers | Primary key `(kind, item_id)` |
+| `sync_flags` | Silences the change triggers while a row exists | Used when applying cloud changes and wiping |
 
 Indexes: `requests(collection_id)`, `folders(collection_id)`, `history_entries(executed_at)`, `env_variables(environment_id)`, and `workspace_id` on `collections`, `environments` and `history_entries`.
 
@@ -38,6 +40,7 @@ Secret fields are written to the OS vault under deterministic keys and deleted t
 | `vesper.collection.<id>.var.<varId>` | Secret collection variable value |
 | `vesper.auth.google.session` | Google session JSON |
 | `vesper.auth.github.session` | GitHub session JSON |
+| `vesper.auth.cloud.session` | Supabase (cloud sync) session JSON |
 
 ## Migrations
 
@@ -57,6 +60,8 @@ Steps run in order, so a user upgrading from v1 to v4 runs every step.
 **v1 → v2 (workspaces):** creates `workspaces` with the default row, adds `workspace_id` (default `'default'`) to collections, environments and history, moves the active environment from `app_settings` onto the default workspace, and renames the `workspace` and `github.sync_target` settings keys to their per-workspace form. Covered by `test/data/workspaces_test.dart`.
 
 **v2 → v3 (collection settings):** adds `auth_json` (`'{}'`) and `variables_json` (`'[]'`) to `collections`.
+
+**v3 → v4 (cloud sync):** creates `sync_outbox`, `sync_flags` and the change triggers (see cloud-sync.md), and renames Globals environments to `globals-<workspaceId>`. Their secret values move in the vault at the next start (`migrateEnvironmentVaultKeys`).
 
 ## Streams
 

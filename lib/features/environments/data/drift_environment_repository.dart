@@ -42,7 +42,11 @@ class DriftEnvironmentRepository implements EnvironmentRepository {
             .getSingleOrNull();
     if (existing == null) {
       final now = DateTime.now();
-      final globals = Environment(name: 'Globals', isGlobal: true);
+      final globals = Environment(
+        id: globalsEnvironmentId(workspaceId),
+        name: 'Globals',
+        isGlobal: true,
+      );
       await _db
           .into(_db.environments)
           .insert(
