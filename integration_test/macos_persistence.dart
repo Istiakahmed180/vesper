@@ -27,6 +27,7 @@ import 'package:vesper/features/environments/presentation/environment_providers.
 import 'package:vesper/features/settings/presentation/settings_controller.dart';
 import 'package:vesper/features/workspace/domain/workspace_models.dart';
 import 'package:vesper/features/workspace/presentation/workspace_controller.dart';
+import 'package:vesper/features/workspaces/presentation/workspace_providers.dart';
 
 import '../test/support/test_server.dart';
 import 'support/harness.dart';
@@ -129,9 +130,10 @@ Future<void> _write(Harness h, ProviderContainer c) async {
       ],
     ),
   );
-  c.read(settingsProvider.notifier)
-    ..setActiveEnvironment(env.id)
-    ..update((s) => s.copyWith(themeMode: ThemeMode.light));
+  await c.read(activeWorkspaceIdProvider.notifier).setActiveEnvironment(env.id);
+  c
+      .read(settingsProvider.notifier)
+      .update((s) => s.copyWith(themeMode: ThemeMode.light));
   await h.until(
     () => c.read(activeEnvironmentProvider)?.name == 'Restart Env',
     what: 'active env',
@@ -179,7 +181,7 @@ Future<void> _verify(
   final env = envs.singleWhere((e) => e.name == 'Restart Env');
   final token = env.variables.singleWhere((v) => v.key == 'token');
   if (token.value != 'test-token') throw TestFailure('env token not restored');
-  if (c.read(settingsProvider).activeEnvironmentId != env.id) {
+  if (c.read(activeEnvironmentIdProvider) != env.id) {
     throw TestFailure('active env lost');
   }
   if (c.read(settingsProvider).themeMode != ThemeMode.light) {

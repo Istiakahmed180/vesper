@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
 import 'package:path_provider/path_provider.dart';
@@ -6,9 +8,29 @@ import '../constants/app_constants.dart';
 
 part 'app_database.g.dart';
 
+/// Workspace that always exists; data from before workspaces lands here.
+const defaultWorkspaceId = 'default';
+const defaultWorkspaceName = 'My Workspace';
+
+/// Top-level container for collections, environments and history.
+@DataClassName('WorkspaceRow')
+class Workspaces extends Table {
+  TextColumn get id => text()();
+  TextColumn get name => text()();
+  IntColumn get sortOrder => integer().withDefault(const Constant(0))();
+  TextColumn get activeEnvironmentId => text().nullable()();
+  DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get updatedAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
 @DataClassName('CollectionRow')
 class Collections extends Table {
   TextColumn get id => text()();
+  TextColumn get workspaceId =>
+      text().withDefault(const Constant(defaultWorkspaceId))();
   TextColumn get name => text()();
   TextColumn get description => text().withDefault(const Constant(''))();
   IntColumn get sortOrder => integer().withDefault(const Constant(0))();
@@ -64,6 +86,8 @@ class Requests extends Table {
 @DataClassName('EnvironmentRow')
 class Environments extends Table {
   TextColumn get id => text()();
+  TextColumn get workspaceId =>
+      text().withDefault(const Constant(defaultWorkspaceId))();
   TextColumn get name => text()();
   BoolColumn get isGlobal => boolean().withDefault(const Constant(false))();
   IntColumn get sortOrder => integer().withDefault(const Constant(0))();
@@ -96,6 +120,8 @@ class EnvVariables extends Table {
 @DataClassName('HistoryRow')
 class HistoryEntries extends Table {
   TextColumn get id => text()();
+  TextColumn get workspaceId =>
+      text().withDefault(const Constant(defaultWorkspaceId))();
   TextColumn get requestId => text().nullable()();
   TextColumn get method => text()();
   TextColumn get url => text()();
@@ -135,6 +161,7 @@ class SyncStates extends Table {
 
 @DriftDatabase(
   tables: [
+    Workspaces,
     Collections,
     Folders,
     Requests,
@@ -159,7 +186,7 @@ class AppDatabase extends _$AppDatabase {
 
   /// Bump when the schema changes and add a step in [migration].
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -169,13 +196,63 @@ class AppDatabase extends _$AppDatabase {
     },
     onUpgrade: (m, from, to) async {
       // Migrations run sequentially: add `if (from < N) { ... }` blocks here.
-      // Example for a future v2:
-      //   if (from < 2) await m.addColumn(requests, requests.someNewColumn);
+      if (from < 2) await _migrateToWorkspaces(m);
     },
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = ON');
+      await _ensureDefaultWorkspace();
     },
   );
+
+  /// v2: existing data moves into the default workspace, together with the
+  /// active environment, open tabs and GitHub sync target.
+  Future<void> _migrateToWorkspaces(Migrator m) async {
+    await m.createTable(workspaces);
+    await m.addColumn(collections, collections.workspaceId);
+    await m.addColumn(environments, environments.workspaceId);
+    await m.addColumn(historyEntries, historyEntries.workspaceId);
+    await _createIndexes();
+    await _ensureDefaultWorkspace();
+
+    final settings = await customSelect(
+      "SELECT value FROM settings_entries WHERE key = 'app_settings'",
+    ).getSingleOrNull();
+    String? activeEnv;
+    try {
+      final json = jsonDecode(settings?.read<String>('value') ?? '{}');
+      if (json is Map && json['activeEnvironmentId'] is String) {
+        activeEnv = json['activeEnvironmentId'] as String;
+      }
+    } on FormatException {
+      // Unreadable settings: start without an active environment.
+    }
+    if (activeEnv != null) {
+      await (update(workspaces)..where((w) => w.id.equals(defaultWorkspaceId)))
+          .write(WorkspacesCompanion(activeEnvironmentId: Value(activeEnv)));
+    }
+    for (final (from, to) in [
+      ('workspace', 'workspace.tabs.$defaultWorkspaceId'),
+      ('github.sync_target', 'github.sync_target.$defaultWorkspaceId'),
+    ]) {
+      await customStatement(
+        'UPDATE settings_entries SET key = ? WHERE key = ?',
+        [to, from],
+      );
+    }
+  }
+
+  Future<void> _ensureDefaultWorkspace() async {
+    final now = DateTime.now();
+    await into(workspaces).insert(
+      WorkspacesCompanion.insert(
+        id: defaultWorkspaceId,
+        name: defaultWorkspaceName,
+        createdAt: now,
+        updatedAt: now,
+      ),
+      mode: InsertMode.insertOrIgnore,
+    );
+  }
 
   Future<void> _createIndexes() async {
     await customStatement(
@@ -190,12 +267,23 @@ class AppDatabase extends _$AppDatabase {
     await customStatement(
       'CREATE INDEX IF NOT EXISTS idx_env_vars_env ON env_variables (environment_id)',
     );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_collections_workspace ON collections (workspace_id)',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_environments_workspace ON environments (workspace_id)',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_history_workspace ON history_entries (workspace_id)',
+    );
   }
 
-  /// Deletes every row in every table (Settings → Clear local database).
+  /// Deletes every row in every table (Settings → Clear local database),
+  /// leaving an empty default workspace.
   Future<void> wipe() => transaction(() async {
     for (final table in allTables.toList().reversed) {
       await delete(table).go();
     }
+    await _ensureDefaultWorkspace();
   });
 }

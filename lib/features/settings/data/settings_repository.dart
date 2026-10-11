@@ -13,7 +13,14 @@ class SettingsRepository {
   final AppDatabase _db;
 
   static const appSettingsKey = 'app_settings';
-  static const workspaceKey = 'workspace';
+  static const activeWorkspaceKey = 'workspaces.active';
+
+  /// Saved requests open as tabs in a workspace.
+  static String tabsKey(String workspaceId) => 'workspace.tabs.$workspaceId';
+
+  /// GitHub repository a workspace syncs with.
+  static String syncTargetKey(String workspaceId) =>
+      'github.sync_target.$workspaceId';
 
   Future<String?> read(String key) async {
     final row = await (_db.select(
@@ -30,6 +37,19 @@ class SettingsRepository {
 
   Future<void> remove(String key) =>
       (_db.delete(_db.settingsEntries)..where((s) => s.key.equals(key))).go();
+
+  Future<void> removeWithPrefix(String prefix) async {
+    final keys =
+        await (_db.selectOnly(_db.settingsEntries)
+              ..addColumns([_db.settingsEntries.key]))
+            .map((r) => r.read(_db.settingsEntries.key)!)
+            .get();
+    final matching = keys.where((k) => k.startsWith(prefix)).toList();
+    if (matching.isEmpty) return;
+    await (_db.delete(
+      _db.settingsEntries,
+    )..where((s) => s.key.isIn(matching))).go();
+  }
 
   Future<JsonMap?> readJson(String key) async {
     final raw = await read(key);

@@ -12,6 +12,7 @@ import '../../environments/presentation/environments_panel.dart';
 import '../../history/presentation/history_panel.dart';
 import '../../import_export/presentation/import_export_actions.dart';
 import '../../sync/presentation/sync_dialog.dart';
+import '../../workspaces/presentation/workspace_switcher.dart';
 import 'app_commands.dart';
 import 'shell_state.dart';
 import 'workspace_actions.dart';
@@ -237,6 +238,7 @@ class _SidebarState extends ConsumerState<Sidebar> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          const WorkspaceSwitcher(),
           SizedBox(
             height: 40,
             child: Padding(

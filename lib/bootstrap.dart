@@ -19,6 +19,7 @@ import 'features/settings/data/settings_repository.dart';
 import 'features/settings/presentation/settings_controller.dart';
 import 'features/workspace/presentation/app_shell.dart';
 import 'features/workspace/presentation/workspace_controller.dart';
+import 'features/workspaces/presentation/workspace_providers.dart';
 
 const minimumWindowSize = Size(980, 620);
 
@@ -66,7 +67,17 @@ Future<ProviderContainer> bootstrap({
   );
 
   final database = AppDatabase.open();
-  final settings = await SettingsRepository(database).loadSettings();
+  final settingsRepo = SettingsRepository(database);
+  final settings = await settingsRepo.loadSettings();
+  final savedWorkspace = await settingsRepo.read(
+    SettingsRepository.activeWorkspaceKey,
+  );
+  final workspaceExists =
+      savedWorkspace != null &&
+      await (database.select(
+            database.workspaces,
+          )..where((w) => w.id.equals(savedWorkspace))).getSingleOrNull() !=
+          null;
 
   // Apply history retention at startup.
   unawaited(
@@ -86,6 +97,9 @@ Future<ProviderContainer> bootstrap({
       loggerProvider.overrideWithValue(logger),
       databaseProvider.overrideWithValue(database),
       initialSettingsProvider.overrideWithValue(settings),
+      initialWorkspaceIdProvider.overrideWithValue(
+        workspaceExists ? savedWorkspace : defaultWorkspaceId,
+      ),
       nativeMenusProvider.overrideWithValue(Platform.isMacOS),
       windowManagedProvider.overrideWithValue(true),
       ...overrides,

@@ -7,10 +7,17 @@ import '../domain/environment_models.dart';
 import '../domain/environment_repository.dart';
 
 class DriftEnvironmentRepository implements EnvironmentRepository {
-  DriftEnvironmentRepository(this._db, this._vault);
+  DriftEnvironmentRepository(
+    this._db,
+    this._vault, {
+    this.workspaceId = defaultWorkspaceId,
+  });
 
   final AppDatabase _db;
   final SecretVault _vault;
+
+  /// Each workspace has its own environments and Globals.
+  final String workspaceId;
   bool _globalsEnsured = false;
 
   @override
@@ -27,9 +34,12 @@ class DriftEnvironmentRepository implements EnvironmentRepository {
 
   Future<void> _ensureGlobals() async {
     if (_globalsEnsured) return;
-    final existing = await (_db.select(
-      _db.environments,
-    )..where((e) => e.isGlobal.equals(true))).getSingleOrNull();
+    final existing =
+        await (_db.select(_db.environments)..where(
+              (e) =>
+                  e.isGlobal.equals(true) & e.workspaceId.equals(workspaceId),
+            ))
+            .getSingleOrNull();
     if (existing == null) {
       final now = DateTime.now();
       final globals = Environment(name: 'Globals', isGlobal: true);
@@ -38,6 +48,7 @@ class DriftEnvironmentRepository implements EnvironmentRepository {
           .insert(
             EnvironmentsCompanion.insert(
               id: globals.id,
+              workspaceId: Value(workspaceId),
               name: globals.name,
               isGlobal: const Value(true),
               sortOrder: const Value(-1),
@@ -51,15 +62,19 @@ class DriftEnvironmentRepository implements EnvironmentRepository {
 
   Future<List<Environment>> _loadAll() async {
     final envs =
-        await (_db.select(_db.environments)..orderBy([
-              (e) => OrderingTerm.desc(e.isGlobal),
-              (e) => OrderingTerm.asc(e.sortOrder),
-              (e) => OrderingTerm.asc(e.createdAt),
-            ]))
+        await (_db.select(_db.environments)
+              ..where((e) => e.workspaceId.equals(workspaceId))
+              ..orderBy([
+                (e) => OrderingTerm.desc(e.isGlobal),
+                (e) => OrderingTerm.asc(e.sortOrder),
+                (e) => OrderingTerm.asc(e.createdAt),
+              ]))
             .get();
-    final vars = await (_db.select(
-      _db.envVariables,
-    )..orderBy([(v) => OrderingTerm.asc(v.sortOrder)])).get();
+    final vars =
+        await (_db.select(_db.envVariables)
+              ..where((v) => v.environmentId.isIn(envs.map((e) => e.id)))
+              ..orderBy([(v) => OrderingTerm.asc(v.sortOrder)]))
+            .get();
     final byEnv = <String, List<EnvVariableRow>>{};
     for (final v in vars) {
       byEnv.putIfAbsent(v.environmentId, () => []).add(v);
@@ -100,9 +115,11 @@ class DriftEnvironmentRepository implements EnvironmentRepository {
     List<EnvVariable> variables = const [],
   }) async {
     final max = _db.environments.sortOrder.max();
-    final row = await (_db.selectOnly(
-      _db.environments,
-    )..addColumns([max])).getSingle();
+    final row =
+        await (_db.selectOnly(_db.environments)
+              ..addColumns([max])
+              ..where(_db.environments.workspaceId.equals(workspaceId)))
+            .getSingle();
     final env = Environment(
       name: name.trim().isEmpty ? 'New environment' : name.trim(),
       sortOrder: (row.read(max) ?? -1) + 1,
@@ -114,6 +131,7 @@ class DriftEnvironmentRepository implements EnvironmentRepository {
         .insert(
           EnvironmentsCompanion.insert(
             id: env.id,
+            workspaceId: Value(workspaceId),
             name: env.name,
             sortOrder: Value(env.sortOrder),
             createdAt: now,

@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/app_providers.dart';
 import '../../../core/errors/app_failure.dart';
+import '../../settings/data/settings_repository.dart';
+import '../../workspaces/presentation/workspace_providers.dart';
 import '../data/github_api.dart';
 import '../data/github_auth_repository.dart';
 import '../domain/github_models.dart';
@@ -45,7 +47,10 @@ class GitHubController extends AsyncNotifier<GitHubSession?> {
 
   Future<void> disconnect() async {
     await _repo.disconnect();
-    await ref.read(settingsRepositoryProvider).remove(_syncTargetKey);
+    // Sync targets of every workspace belong to this GitHub account.
+    await ref
+        .read(settingsRepositoryProvider)
+        .removeWithPrefix(SettingsRepository.syncTargetKey(''));
     ref.invalidate(syncTargetProvider);
     state = const AsyncData(null);
   }
@@ -72,33 +77,33 @@ final githubReposProvider = FutureProvider.autoDispose<List<GitHubRepo>>((
   }
 });
 
-const _syncTargetKey = 'github.sync_target';
-
 final syncTargetProvider =
     AsyncNotifierProvider<SyncTargetController, SyncTarget?>(
       SyncTargetController.new,
     );
 
+/// GitHub repository the active workspace syncs with.
 class SyncTargetController extends AsyncNotifier<SyncTarget?> {
+  late String _key;
+
   @override
   Future<SyncTarget?> build() async {
-    final json = await ref
-        .read(settingsRepositoryProvider)
-        .readJson(_syncTargetKey);
+    _key = SettingsRepository.syncTargetKey(
+      ref.watch(activeWorkspaceIdProvider),
+    );
+    final json = await ref.read(settingsRepositoryProvider).readJson(_key);
     if (json == null) return null;
     final target = SyncTarget.fromJson(json);
     return target.repo.isEmpty ? null : target;
   }
 
   Future<void> select(SyncTarget target) async {
-    await ref
-        .read(settingsRepositoryProvider)
-        .writeJson(_syncTargetKey, target.toJson());
+    await ref.read(settingsRepositoryProvider).writeJson(_key, target.toJson());
     state = AsyncData(target);
   }
 
   Future<void> clear() async {
-    await ref.read(settingsRepositoryProvider).remove(_syncTargetKey);
+    await ref.read(settingsRepositoryProvider).remove(_key);
     state = const AsyncData(null);
   }
 }

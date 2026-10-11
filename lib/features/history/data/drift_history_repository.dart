@@ -12,14 +12,20 @@ class DriftHistoryRepository implements HistoryRepository {
   DriftHistoryRepository(
     this._db, {
     this._sanitizer = const HistorySanitizer(),
+    this.workspaceId = defaultWorkspaceId,
   });
 
   final AppDatabase _db;
   final HistorySanitizer _sanitizer;
 
+  /// Entries are recorded in, listed and cleared for this workspace only.
+  /// [prune] applies the retention limits to every workspace.
+  final String workspaceId;
+
   @override
   Stream<List<HistoryEntry>> watch({int limit = 500}) =>
       (_db.select(_db.historyEntries)
+            ..where((h) => h.workspaceId.equals(workspaceId))
             ..orderBy([(h) => OrderingTerm.desc(h.executedAt)])
             ..limit(limit))
           .watch()
@@ -53,6 +59,7 @@ class DriftHistoryRepository implements HistoryRepository {
         .insert(
           HistoryEntriesCompanion.insert(
             id: entry.id,
+            workspaceId: Value(workspaceId),
             requestId: Value(entry.requestId),
             method: safe.method.value,
             url: safe.url,
@@ -80,7 +87,9 @@ class DriftHistoryRepository implements HistoryRepository {
       (_db.delete(_db.historyEntries)..where((h) => h.id.equals(id))).go();
 
   @override
-  Future<void> clear() => _db.delete(_db.historyEntries).go();
+  Future<void> clear() => (_db.delete(
+    _db.historyEntries,
+  )..where((h) => h.workspaceId.equals(workspaceId))).go();
 
   @override
   Future<int> prune({

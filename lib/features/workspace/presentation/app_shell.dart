@@ -15,6 +15,7 @@ import '../../environments/presentation/environment_editor.dart';
 import '../../environments/presentation/environment_providers.dart';
 import '../../github/presentation/github_providers.dart';
 import '../../settings/presentation/settings_view.dart';
+import '../../workspaces/presentation/workspace_providers.dart';
 import '../domain/workspace_models.dart';
 import 'app_commands.dart';
 import 'shell_state.dart';
@@ -344,6 +345,7 @@ class _StatusBar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final colors = context.colors;
     final env = ref.watch(activeEnvironmentProvider);
+    final workspace = ref.watch(activeWorkspaceProvider);
     final github = ref.watch(githubSessionProvider).value;
     final style = TextStyle(fontSize: 11.5, color: colors.textMuted);
     Widget item(IconData icon, String text, {Color? color}) => Padding(
@@ -365,7 +367,7 @@ class _StatusBar extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          item(Icons.computer, 'Local workspace'),
+          item(Icons.workspaces_outline, workspace?.name ?? 'Workspace'),
           item(
             Icons.layers_outlined,
             env == null ? 'No environment' : env.name,

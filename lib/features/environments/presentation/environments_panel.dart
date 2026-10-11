@@ -6,8 +6,8 @@ import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/dialogs.dart';
 import '../../../shared/widgets/section_tabs.dart';
 import '../../import_export/presentation/import_export_actions.dart';
-import '../../settings/presentation/settings_controller.dart';
 import '../../workspace/presentation/workspace_controller.dart';
+import '../../workspaces/presentation/workspace_providers.dart';
 import '../domain/environment_models.dart';
 import 'environment_providers.dart';
 
@@ -33,9 +33,7 @@ class EnvironmentsPanel extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final envs = ref.watch(environmentsProvider);
-    final activeId = ref.watch(
-      settingsProvider.select((s) => s.activeEnvironmentId),
-    );
+    final activeId = ref.watch(activeEnvironmentIdProvider);
     return envs.when(
       loading: () => const Center(
         child: SizedBox(
@@ -96,7 +94,7 @@ class _EnvRowState extends ConsumerState<_EnvRow> {
     final colors = context.colors;
     final e = widget.env;
     final repo = ref.read(environmentRepositoryProvider);
-    final settings = ref.read(settingsProvider.notifier);
+    final settings = ref.read(activeWorkspaceIdProvider.notifier);
     return MenuAnchor(
       controller: _menu,
       menuChildren: [
@@ -164,8 +162,10 @@ class _EnvRowState extends ConsumerState<_EnvRow> {
                     'Delete "${e.name}" and its ${e.variables.length} variable(s)? This cannot be undone.',
               );
               if (!ok || !context.mounted) return;
-              if (widget.active) settings.setActiveEnvironment(null);
-              await guarded(context, () => repo.deleteEnvironment(e.id));
+              await guarded(context, () async {
+                if (widget.active) await settings.setActiveEnvironment(null);
+                await repo.deleteEnvironment(e.id);
+              });
             },
             child: Text('Delete', style: TextStyle(color: colors.danger)),
           ),
@@ -303,8 +303,9 @@ class EnvironmentSelector extends ConsumerWidget {
       menuChildren: [
         MenuItemButton(
           leadingIcon: Icon(active == null ? Icons.check : null, size: 16),
-          onPressed: () =>
-              ref.read(settingsProvider.notifier).setActiveEnvironment(null),
+          onPressed: () => ref
+              .read(activeWorkspaceIdProvider.notifier)
+              .setActiveEnvironment(null),
           child: const Text('No environment'),
         ),
         for (final e in envs)
@@ -313,8 +314,9 @@ class EnvironmentSelector extends ConsumerWidget {
               active?.id == e.id ? Icons.check : null,
               size: 16,
             ),
-            onPressed: () =>
-                ref.read(settingsProvider.notifier).setActiveEnvironment(e.id),
+            onPressed: () => ref
+                .read(activeWorkspaceIdProvider.notifier)
+                .setActiveEnvironment(e.id),
             child: Text(e.name),
           ),
         const Divider(),

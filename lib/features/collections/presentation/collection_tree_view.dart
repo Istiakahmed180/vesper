@@ -11,6 +11,9 @@ import '../../import_export/presentation/import_export_actions.dart';
 import '../../sync/presentation/sync_dialog.dart';
 import '../../workspace/domain/workspace_models.dart';
 import '../../workspace/presentation/workspace_controller.dart';
+import '../../workspaces/domain/workspace.dart';
+import '../../workspaces/presentation/workspace_providers.dart';
+import '../../workspaces/presentation/workspace_switcher.dart';
 import '../domain/collection_models.dart';
 import 'collection_providers.dart';
 
@@ -317,6 +320,12 @@ class _CollectionRow extends ConsumerWidget {
     final c = tree.collection;
     final repo = ref.read(collectionRepositoryProvider);
     final loc = TreeLocation(c.id);
+    final activeWorkspace = ref.watch(activeWorkspaceIdProvider);
+    final otherWorkspaces = [
+      for (final w
+          in ref.watch(workspacesProvider).value ?? const <Workspace>[])
+        if (w.id != activeWorkspace) w,
+    ];
 
     return DragTarget<TreeDrag>(
       onWillAcceptWithDetails: (d) => true,
@@ -398,6 +407,26 @@ class _CollectionRow extends ConsumerWidget {
               onPressed: () => showSyncDialog(context, collectionId: c.id),
               child: const Text('Sync with GitHub…'),
             ),
+            if (otherWorkspaces.isNotEmpty)
+              SubmenuButton(
+                leadingIcon: const Icon(
+                  Icons.drive_file_move_outline,
+                  size: 16,
+                ),
+                menuChildren: [
+                  for (final w in otherWorkspaces)
+                    MenuItemButton(
+                      leadingIcon: WorkspaceAvatar(name: w.name, size: 18),
+                      onPressed: () => guarded(
+                        context,
+                        () => repo.moveCollectionToWorkspace(c.id, w.id),
+                        success: 'Moved "${c.name}" to ${w.name}',
+                      ),
+                      child: Text(w.name),
+                    ),
+                ],
+                child: const Text('Move to workspace'),
+              ),
             const Divider(),
             MenuItemButton(
               leadingIcon: Icon(

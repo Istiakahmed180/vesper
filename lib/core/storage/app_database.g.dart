@@ -3,6 +3,431 @@
 part of 'app_database.dart';
 
 // ignore_for_file: type=lint
+class $WorkspacesTable extends Workspaces
+    with TableInfo<$WorkspacesTable, WorkspaceRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $WorkspacesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sortOrderMeta = const VerificationMeta(
+    'sortOrder',
+  );
+  @override
+  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
+    'sort_order',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _activeEnvironmentIdMeta =
+      const VerificationMeta('activeEnvironmentId');
+  @override
+  late final GeneratedColumn<String> activeEnvironmentId =
+      GeneratedColumn<String>(
+        'active_environment_id',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    name,
+    sortOrder,
+    activeEnvironmentId,
+    createdAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'workspaces';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<WorkspaceRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('sort_order')) {
+      context.handle(
+        _sortOrderMeta,
+        sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
+      );
+    }
+    if (data.containsKey('active_environment_id')) {
+      context.handle(
+        _activeEnvironmentIdMeta,
+        activeEnvironmentId.isAcceptableOrUnknown(
+          data['active_environment_id']!,
+          _activeEnvironmentIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  WorkspaceRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return WorkspaceRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      sortOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sort_order'],
+      )!,
+      activeEnvironmentId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}active_environment_id'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $WorkspacesTable createAlias(String alias) {
+    return $WorkspacesTable(attachedDatabase, alias);
+  }
+}
+
+class WorkspaceRow extends DataClass implements Insertable<WorkspaceRow> {
+  final String id;
+  final String name;
+  final int sortOrder;
+  final String? activeEnvironmentId;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  const WorkspaceRow({
+    required this.id,
+    required this.name,
+    required this.sortOrder,
+    this.activeEnvironmentId,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['name'] = Variable<String>(name);
+    map['sort_order'] = Variable<int>(sortOrder);
+    if (!nullToAbsent || activeEnvironmentId != null) {
+      map['active_environment_id'] = Variable<String>(activeEnvironmentId);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  WorkspacesCompanion toCompanion(bool nullToAbsent) {
+    return WorkspacesCompanion(
+      id: Value(id),
+      name: Value(name),
+      sortOrder: Value(sortOrder),
+      activeEnvironmentId: activeEnvironmentId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(activeEnvironmentId),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory WorkspaceRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return WorkspaceRow(
+      id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      sortOrder: serializer.fromJson<int>(json['sortOrder']),
+      activeEnvironmentId: serializer.fromJson<String?>(
+        json['activeEnvironmentId'],
+      ),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String>(name),
+      'sortOrder': serializer.toJson<int>(sortOrder),
+      'activeEnvironmentId': serializer.toJson<String?>(activeEnvironmentId),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  WorkspaceRow copyWith({
+    String? id,
+    String? name,
+    int? sortOrder,
+    Value<String?> activeEnvironmentId = const Value.absent(),
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) => WorkspaceRow(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    sortOrder: sortOrder ?? this.sortOrder,
+    activeEnvironmentId: activeEnvironmentId.present
+        ? activeEnvironmentId.value
+        : this.activeEnvironmentId,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  WorkspaceRow copyWithCompanion(WorkspacesCompanion data) {
+    return WorkspaceRow(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
+      activeEnvironmentId: data.activeEnvironmentId.present
+          ? data.activeEnvironmentId.value
+          : this.activeEnvironmentId,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('WorkspaceRow(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('activeEnvironmentId: $activeEnvironmentId, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    name,
+    sortOrder,
+    activeEnvironmentId,
+    createdAt,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is WorkspaceRow &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.sortOrder == this.sortOrder &&
+          other.activeEnvironmentId == this.activeEnvironmentId &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class WorkspacesCompanion extends UpdateCompanion<WorkspaceRow> {
+  final Value<String> id;
+  final Value<String> name;
+  final Value<int> sortOrder;
+  final Value<String?> activeEnvironmentId;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const WorkspacesCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.activeEnvironmentId = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  WorkspacesCompanion.insert({
+    required String id,
+    required String name,
+    this.sortOrder = const Value.absent(),
+    this.activeEnvironmentId = const Value.absent(),
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       name = Value(name),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<WorkspaceRow> custom({
+    Expression<String>? id,
+    Expression<String>? name,
+    Expression<int>? sortOrder,
+    Expression<String>? activeEnvironmentId,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (sortOrder != null) 'sort_order': sortOrder,
+      if (activeEnvironmentId != null)
+        'active_environment_id': activeEnvironmentId,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  WorkspacesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? name,
+    Value<int>? sortOrder,
+    Value<String?>? activeEnvironmentId,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return WorkspacesCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      sortOrder: sortOrder ?? this.sortOrder,
+      activeEnvironmentId: activeEnvironmentId ?? this.activeEnvironmentId,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<int>(sortOrder.value);
+    }
+    if (activeEnvironmentId.present) {
+      map['active_environment_id'] = Variable<String>(
+        activeEnvironmentId.value,
+      );
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('WorkspacesCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('activeEnvironmentId: $activeEnvironmentId, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $CollectionsTable extends Collections
     with TableInfo<$CollectionsTable, CollectionRow> {
   @override
@@ -17,6 +442,18 @@ class $CollectionsTable extends Collections
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: true,
+  );
+  static const VerificationMeta _workspaceIdMeta = const VerificationMeta(
+    'workspaceId',
+  );
+  @override
+  late final GeneratedColumn<String> workspaceId = GeneratedColumn<String>(
+    'workspace_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(defaultWorkspaceId),
   );
   static const VerificationMeta _nameMeta = const VerificationMeta('name');
   @override
@@ -76,6 +513,7 @@ class $CollectionsTable extends Collections
   @override
   List<GeneratedColumn> get $columns => [
     id,
+    workspaceId,
     name,
     description,
     sortOrder,
@@ -98,6 +536,15 @@ class $CollectionsTable extends Collections
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
     } else if (isInserting) {
       context.missing(_idMeta);
+    }
+    if (data.containsKey('workspace_id')) {
+      context.handle(
+        _workspaceIdMeta,
+        workspaceId.isAcceptableOrUnknown(
+          data['workspace_id']!,
+          _workspaceIdMeta,
+        ),
+      );
     }
     if (data.containsKey('name')) {
       context.handle(
@@ -151,6 +598,10 @@ class $CollectionsTable extends Collections
         DriftSqlType.string,
         data['${effectivePrefix}id'],
       )!,
+      workspaceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}workspace_id'],
+      )!,
       name: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}name'],
@@ -182,6 +633,7 @@ class $CollectionsTable extends Collections
 
 class CollectionRow extends DataClass implements Insertable<CollectionRow> {
   final String id;
+  final String workspaceId;
   final String name;
   final String description;
   final int sortOrder;
@@ -189,6 +641,7 @@ class CollectionRow extends DataClass implements Insertable<CollectionRow> {
   final DateTime updatedAt;
   const CollectionRow({
     required this.id,
+    required this.workspaceId,
     required this.name,
     required this.description,
     required this.sortOrder,
@@ -199,6 +652,7 @@ class CollectionRow extends DataClass implements Insertable<CollectionRow> {
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
+    map['workspace_id'] = Variable<String>(workspaceId);
     map['name'] = Variable<String>(name);
     map['description'] = Variable<String>(description);
     map['sort_order'] = Variable<int>(sortOrder);
@@ -210,6 +664,7 @@ class CollectionRow extends DataClass implements Insertable<CollectionRow> {
   CollectionsCompanion toCompanion(bool nullToAbsent) {
     return CollectionsCompanion(
       id: Value(id),
+      workspaceId: Value(workspaceId),
       name: Value(name),
       description: Value(description),
       sortOrder: Value(sortOrder),
@@ -225,6 +680,7 @@ class CollectionRow extends DataClass implements Insertable<CollectionRow> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return CollectionRow(
       id: serializer.fromJson<String>(json['id']),
+      workspaceId: serializer.fromJson<String>(json['workspaceId']),
       name: serializer.fromJson<String>(json['name']),
       description: serializer.fromJson<String>(json['description']),
       sortOrder: serializer.fromJson<int>(json['sortOrder']),
@@ -237,6 +693,7 @@ class CollectionRow extends DataClass implements Insertable<CollectionRow> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'id': serializer.toJson<String>(id),
+      'workspaceId': serializer.toJson<String>(workspaceId),
       'name': serializer.toJson<String>(name),
       'description': serializer.toJson<String>(description),
       'sortOrder': serializer.toJson<int>(sortOrder),
@@ -247,6 +704,7 @@ class CollectionRow extends DataClass implements Insertable<CollectionRow> {
 
   CollectionRow copyWith({
     String? id,
+    String? workspaceId,
     String? name,
     String? description,
     int? sortOrder,
@@ -254,6 +712,7 @@ class CollectionRow extends DataClass implements Insertable<CollectionRow> {
     DateTime? updatedAt,
   }) => CollectionRow(
     id: id ?? this.id,
+    workspaceId: workspaceId ?? this.workspaceId,
     name: name ?? this.name,
     description: description ?? this.description,
     sortOrder: sortOrder ?? this.sortOrder,
@@ -263,6 +722,9 @@ class CollectionRow extends DataClass implements Insertable<CollectionRow> {
   CollectionRow copyWithCompanion(CollectionsCompanion data) {
     return CollectionRow(
       id: data.id.present ? data.id.value : this.id,
+      workspaceId: data.workspaceId.present
+          ? data.workspaceId.value
+          : this.workspaceId,
       name: data.name.present ? data.name.value : this.name,
       description: data.description.present
           ? data.description.value
@@ -277,6 +739,7 @@ class CollectionRow extends DataClass implements Insertable<CollectionRow> {
   String toString() {
     return (StringBuffer('CollectionRow(')
           ..write('id: $id, ')
+          ..write('workspaceId: $workspaceId, ')
           ..write('name: $name, ')
           ..write('description: $description, ')
           ..write('sortOrder: $sortOrder, ')
@@ -287,13 +750,21 @@ class CollectionRow extends DataClass implements Insertable<CollectionRow> {
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, name, description, sortOrder, createdAt, updatedAt);
+  int get hashCode => Object.hash(
+    id,
+    workspaceId,
+    name,
+    description,
+    sortOrder,
+    createdAt,
+    updatedAt,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is CollectionRow &&
           other.id == this.id &&
+          other.workspaceId == this.workspaceId &&
           other.name == this.name &&
           other.description == this.description &&
           other.sortOrder == this.sortOrder &&
@@ -303,6 +774,7 @@ class CollectionRow extends DataClass implements Insertable<CollectionRow> {
 
 class CollectionsCompanion extends UpdateCompanion<CollectionRow> {
   final Value<String> id;
+  final Value<String> workspaceId;
   final Value<String> name;
   final Value<String> description;
   final Value<int> sortOrder;
@@ -311,6 +783,7 @@ class CollectionsCompanion extends UpdateCompanion<CollectionRow> {
   final Value<int> rowid;
   const CollectionsCompanion({
     this.id = const Value.absent(),
+    this.workspaceId = const Value.absent(),
     this.name = const Value.absent(),
     this.description = const Value.absent(),
     this.sortOrder = const Value.absent(),
@@ -320,6 +793,7 @@ class CollectionsCompanion extends UpdateCompanion<CollectionRow> {
   });
   CollectionsCompanion.insert({
     required String id,
+    this.workspaceId = const Value.absent(),
     required String name,
     this.description = const Value.absent(),
     this.sortOrder = const Value.absent(),
@@ -332,6 +806,7 @@ class CollectionsCompanion extends UpdateCompanion<CollectionRow> {
        updatedAt = Value(updatedAt);
   static Insertable<CollectionRow> custom({
     Expression<String>? id,
+    Expression<String>? workspaceId,
     Expression<String>? name,
     Expression<String>? description,
     Expression<int>? sortOrder,
@@ -341,6 +816,7 @@ class CollectionsCompanion extends UpdateCompanion<CollectionRow> {
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
+      if (workspaceId != null) 'workspace_id': workspaceId,
       if (name != null) 'name': name,
       if (description != null) 'description': description,
       if (sortOrder != null) 'sort_order': sortOrder,
@@ -352,6 +828,7 @@ class CollectionsCompanion extends UpdateCompanion<CollectionRow> {
 
   CollectionsCompanion copyWith({
     Value<String>? id,
+    Value<String>? workspaceId,
     Value<String>? name,
     Value<String>? description,
     Value<int>? sortOrder,
@@ -361,6 +838,7 @@ class CollectionsCompanion extends UpdateCompanion<CollectionRow> {
   }) {
     return CollectionsCompanion(
       id: id ?? this.id,
+      workspaceId: workspaceId ?? this.workspaceId,
       name: name ?? this.name,
       description: description ?? this.description,
       sortOrder: sortOrder ?? this.sortOrder,
@@ -375,6 +853,9 @@ class CollectionsCompanion extends UpdateCompanion<CollectionRow> {
     final map = <String, Expression>{};
     if (id.present) {
       map['id'] = Variable<String>(id.value);
+    }
+    if (workspaceId.present) {
+      map['workspace_id'] = Variable<String>(workspaceId.value);
     }
     if (name.present) {
       map['name'] = Variable<String>(name.value);
@@ -401,6 +882,7 @@ class CollectionsCompanion extends UpdateCompanion<CollectionRow> {
   String toString() {
     return (StringBuffer('CollectionsCompanion(')
           ..write('id: $id, ')
+          ..write('workspaceId: $workspaceId, ')
           ..write('name: $name, ')
           ..write('description: $description, ')
           ..write('sortOrder: $sortOrder, ')
@@ -1755,6 +2237,18 @@ class $EnvironmentsTable extends Environments
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _workspaceIdMeta = const VerificationMeta(
+    'workspaceId',
+  );
+  @override
+  late final GeneratedColumn<String> workspaceId = GeneratedColumn<String>(
+    'workspace_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(defaultWorkspaceId),
+  );
   static const VerificationMeta _nameMeta = const VerificationMeta('name');
   @override
   late final GeneratedColumn<String> name = GeneratedColumn<String>(
@@ -1816,6 +2310,7 @@ class $EnvironmentsTable extends Environments
   @override
   List<GeneratedColumn> get $columns => [
     id,
+    workspaceId,
     name,
     isGlobal,
     sortOrder,
@@ -1838,6 +2333,15 @@ class $EnvironmentsTable extends Environments
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
     } else if (isInserting) {
       context.missing(_idMeta);
+    }
+    if (data.containsKey('workspace_id')) {
+      context.handle(
+        _workspaceIdMeta,
+        workspaceId.isAcceptableOrUnknown(
+          data['workspace_id']!,
+          _workspaceIdMeta,
+        ),
+      );
     }
     if (data.containsKey('name')) {
       context.handle(
@@ -1888,6 +2392,10 @@ class $EnvironmentsTable extends Environments
         DriftSqlType.string,
         data['${effectivePrefix}id'],
       )!,
+      workspaceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}workspace_id'],
+      )!,
       name: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}name'],
@@ -1919,6 +2427,7 @@ class $EnvironmentsTable extends Environments
 
 class EnvironmentRow extends DataClass implements Insertable<EnvironmentRow> {
   final String id;
+  final String workspaceId;
   final String name;
   final bool isGlobal;
   final int sortOrder;
@@ -1926,6 +2435,7 @@ class EnvironmentRow extends DataClass implements Insertable<EnvironmentRow> {
   final DateTime updatedAt;
   const EnvironmentRow({
     required this.id,
+    required this.workspaceId,
     required this.name,
     required this.isGlobal,
     required this.sortOrder,
@@ -1936,6 +2446,7 @@ class EnvironmentRow extends DataClass implements Insertable<EnvironmentRow> {
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
+    map['workspace_id'] = Variable<String>(workspaceId);
     map['name'] = Variable<String>(name);
     map['is_global'] = Variable<bool>(isGlobal);
     map['sort_order'] = Variable<int>(sortOrder);
@@ -1947,6 +2458,7 @@ class EnvironmentRow extends DataClass implements Insertable<EnvironmentRow> {
   EnvironmentsCompanion toCompanion(bool nullToAbsent) {
     return EnvironmentsCompanion(
       id: Value(id),
+      workspaceId: Value(workspaceId),
       name: Value(name),
       isGlobal: Value(isGlobal),
       sortOrder: Value(sortOrder),
@@ -1962,6 +2474,7 @@ class EnvironmentRow extends DataClass implements Insertable<EnvironmentRow> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return EnvironmentRow(
       id: serializer.fromJson<String>(json['id']),
+      workspaceId: serializer.fromJson<String>(json['workspaceId']),
       name: serializer.fromJson<String>(json['name']),
       isGlobal: serializer.fromJson<bool>(json['isGlobal']),
       sortOrder: serializer.fromJson<int>(json['sortOrder']),
@@ -1974,6 +2487,7 @@ class EnvironmentRow extends DataClass implements Insertable<EnvironmentRow> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'id': serializer.toJson<String>(id),
+      'workspaceId': serializer.toJson<String>(workspaceId),
       'name': serializer.toJson<String>(name),
       'isGlobal': serializer.toJson<bool>(isGlobal),
       'sortOrder': serializer.toJson<int>(sortOrder),
@@ -1984,6 +2498,7 @@ class EnvironmentRow extends DataClass implements Insertable<EnvironmentRow> {
 
   EnvironmentRow copyWith({
     String? id,
+    String? workspaceId,
     String? name,
     bool? isGlobal,
     int? sortOrder,
@@ -1991,6 +2506,7 @@ class EnvironmentRow extends DataClass implements Insertable<EnvironmentRow> {
     DateTime? updatedAt,
   }) => EnvironmentRow(
     id: id ?? this.id,
+    workspaceId: workspaceId ?? this.workspaceId,
     name: name ?? this.name,
     isGlobal: isGlobal ?? this.isGlobal,
     sortOrder: sortOrder ?? this.sortOrder,
@@ -2000,6 +2516,9 @@ class EnvironmentRow extends DataClass implements Insertable<EnvironmentRow> {
   EnvironmentRow copyWithCompanion(EnvironmentsCompanion data) {
     return EnvironmentRow(
       id: data.id.present ? data.id.value : this.id,
+      workspaceId: data.workspaceId.present
+          ? data.workspaceId.value
+          : this.workspaceId,
       name: data.name.present ? data.name.value : this.name,
       isGlobal: data.isGlobal.present ? data.isGlobal.value : this.isGlobal,
       sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
@@ -2012,6 +2531,7 @@ class EnvironmentRow extends DataClass implements Insertable<EnvironmentRow> {
   String toString() {
     return (StringBuffer('EnvironmentRow(')
           ..write('id: $id, ')
+          ..write('workspaceId: $workspaceId, ')
           ..write('name: $name, ')
           ..write('isGlobal: $isGlobal, ')
           ..write('sortOrder: $sortOrder, ')
@@ -2022,13 +2542,21 @@ class EnvironmentRow extends DataClass implements Insertable<EnvironmentRow> {
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, name, isGlobal, sortOrder, createdAt, updatedAt);
+  int get hashCode => Object.hash(
+    id,
+    workspaceId,
+    name,
+    isGlobal,
+    sortOrder,
+    createdAt,
+    updatedAt,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is EnvironmentRow &&
           other.id == this.id &&
+          other.workspaceId == this.workspaceId &&
           other.name == this.name &&
           other.isGlobal == this.isGlobal &&
           other.sortOrder == this.sortOrder &&
@@ -2038,6 +2566,7 @@ class EnvironmentRow extends DataClass implements Insertable<EnvironmentRow> {
 
 class EnvironmentsCompanion extends UpdateCompanion<EnvironmentRow> {
   final Value<String> id;
+  final Value<String> workspaceId;
   final Value<String> name;
   final Value<bool> isGlobal;
   final Value<int> sortOrder;
@@ -2046,6 +2575,7 @@ class EnvironmentsCompanion extends UpdateCompanion<EnvironmentRow> {
   final Value<int> rowid;
   const EnvironmentsCompanion({
     this.id = const Value.absent(),
+    this.workspaceId = const Value.absent(),
     this.name = const Value.absent(),
     this.isGlobal = const Value.absent(),
     this.sortOrder = const Value.absent(),
@@ -2055,6 +2585,7 @@ class EnvironmentsCompanion extends UpdateCompanion<EnvironmentRow> {
   });
   EnvironmentsCompanion.insert({
     required String id,
+    this.workspaceId = const Value.absent(),
     required String name,
     this.isGlobal = const Value.absent(),
     this.sortOrder = const Value.absent(),
@@ -2067,6 +2598,7 @@ class EnvironmentsCompanion extends UpdateCompanion<EnvironmentRow> {
        updatedAt = Value(updatedAt);
   static Insertable<EnvironmentRow> custom({
     Expression<String>? id,
+    Expression<String>? workspaceId,
     Expression<String>? name,
     Expression<bool>? isGlobal,
     Expression<int>? sortOrder,
@@ -2076,6 +2608,7 @@ class EnvironmentsCompanion extends UpdateCompanion<EnvironmentRow> {
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
+      if (workspaceId != null) 'workspace_id': workspaceId,
       if (name != null) 'name': name,
       if (isGlobal != null) 'is_global': isGlobal,
       if (sortOrder != null) 'sort_order': sortOrder,
@@ -2087,6 +2620,7 @@ class EnvironmentsCompanion extends UpdateCompanion<EnvironmentRow> {
 
   EnvironmentsCompanion copyWith({
     Value<String>? id,
+    Value<String>? workspaceId,
     Value<String>? name,
     Value<bool>? isGlobal,
     Value<int>? sortOrder,
@@ -2096,6 +2630,7 @@ class EnvironmentsCompanion extends UpdateCompanion<EnvironmentRow> {
   }) {
     return EnvironmentsCompanion(
       id: id ?? this.id,
+      workspaceId: workspaceId ?? this.workspaceId,
       name: name ?? this.name,
       isGlobal: isGlobal ?? this.isGlobal,
       sortOrder: sortOrder ?? this.sortOrder,
@@ -2110,6 +2645,9 @@ class EnvironmentsCompanion extends UpdateCompanion<EnvironmentRow> {
     final map = <String, Expression>{};
     if (id.present) {
       map['id'] = Variable<String>(id.value);
+    }
+    if (workspaceId.present) {
+      map['workspace_id'] = Variable<String>(workspaceId.value);
     }
     if (name.present) {
       map['name'] = Variable<String>(name.value);
@@ -2136,6 +2674,7 @@ class EnvironmentsCompanion extends UpdateCompanion<EnvironmentRow> {
   String toString() {
     return (StringBuffer('EnvironmentsCompanion(')
           ..write('id: $id, ')
+          ..write('workspaceId: $workspaceId, ')
           ..write('name: $name, ')
           ..write('isGlobal: $isGlobal, ')
           ..write('sortOrder: $sortOrder, ')
@@ -2621,6 +3160,18 @@ class $HistoryEntriesTable extends HistoryEntries
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _workspaceIdMeta = const VerificationMeta(
+    'workspaceId',
+  );
+  @override
+  late final GeneratedColumn<String> workspaceId = GeneratedColumn<String>(
+    'workspace_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(defaultWorkspaceId),
+  );
   static const VerificationMeta _requestIdMeta = const VerificationMeta(
     'requestId',
   );
@@ -2721,6 +3272,7 @@ class $HistoryEntriesTable extends HistoryEntries
   @override
   List<GeneratedColumn> get $columns => [
     id,
+    workspaceId,
     requestId,
     method,
     url,
@@ -2747,6 +3299,15 @@ class $HistoryEntriesTable extends HistoryEntries
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
     } else if (isInserting) {
       context.missing(_idMeta);
+    }
+    if (data.containsKey('workspace_id')) {
+      context.handle(
+        _workspaceIdMeta,
+        workspaceId.isAcceptableOrUnknown(
+          data['workspace_id']!,
+          _workspaceIdMeta,
+        ),
+      );
     }
     if (data.containsKey('request_id')) {
       context.handle(
@@ -2829,6 +3390,10 @@ class $HistoryEntriesTable extends HistoryEntries
         DriftSqlType.string,
         data['${effectivePrefix}id'],
       )!,
+      workspaceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}workspace_id'],
+      )!,
       requestId: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}request_id'],
@@ -2876,6 +3441,7 @@ class $HistoryEntriesTable extends HistoryEntries
 
 class HistoryRow extends DataClass implements Insertable<HistoryRow> {
   final String id;
+  final String workspaceId;
   final String? requestId;
   final String method;
   final String url;
@@ -2887,6 +3453,7 @@ class HistoryRow extends DataClass implements Insertable<HistoryRow> {
   final String requestJson;
   const HistoryRow({
     required this.id,
+    required this.workspaceId,
     this.requestId,
     required this.method,
     required this.url,
@@ -2901,6 +3468,7 @@ class HistoryRow extends DataClass implements Insertable<HistoryRow> {
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
+    map['workspace_id'] = Variable<String>(workspaceId);
     if (!nullToAbsent || requestId != null) {
       map['request_id'] = Variable<String>(requestId);
     }
@@ -2922,6 +3490,7 @@ class HistoryRow extends DataClass implements Insertable<HistoryRow> {
   HistoryEntriesCompanion toCompanion(bool nullToAbsent) {
     return HistoryEntriesCompanion(
       id: Value(id),
+      workspaceId: Value(workspaceId),
       requestId: requestId == null && nullToAbsent
           ? const Value.absent()
           : Value(requestId),
@@ -2947,6 +3516,7 @@ class HistoryRow extends DataClass implements Insertable<HistoryRow> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return HistoryRow(
       id: serializer.fromJson<String>(json['id']),
+      workspaceId: serializer.fromJson<String>(json['workspaceId']),
       requestId: serializer.fromJson<String?>(json['requestId']),
       method: serializer.fromJson<String>(json['method']),
       url: serializer.fromJson<String>(json['url']),
@@ -2963,6 +3533,7 @@ class HistoryRow extends DataClass implements Insertable<HistoryRow> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'id': serializer.toJson<String>(id),
+      'workspaceId': serializer.toJson<String>(workspaceId),
       'requestId': serializer.toJson<String?>(requestId),
       'method': serializer.toJson<String>(method),
       'url': serializer.toJson<String>(url),
@@ -2977,6 +3548,7 @@ class HistoryRow extends DataClass implements Insertable<HistoryRow> {
 
   HistoryRow copyWith({
     String? id,
+    String? workspaceId,
     Value<String?> requestId = const Value.absent(),
     String? method,
     String? url,
@@ -2988,6 +3560,7 @@ class HistoryRow extends DataClass implements Insertable<HistoryRow> {
     String? requestJson,
   }) => HistoryRow(
     id: id ?? this.id,
+    workspaceId: workspaceId ?? this.workspaceId,
     requestId: requestId.present ? requestId.value : this.requestId,
     method: method ?? this.method,
     url: url ?? this.url,
@@ -3001,6 +3574,9 @@ class HistoryRow extends DataClass implements Insertable<HistoryRow> {
   HistoryRow copyWithCompanion(HistoryEntriesCompanion data) {
     return HistoryRow(
       id: data.id.present ? data.id.value : this.id,
+      workspaceId: data.workspaceId.present
+          ? data.workspaceId.value
+          : this.workspaceId,
       requestId: data.requestId.present ? data.requestId.value : this.requestId,
       method: data.method.present ? data.method.value : this.method,
       url: data.url.present ? data.url.value : this.url,
@@ -3027,6 +3603,7 @@ class HistoryRow extends DataClass implements Insertable<HistoryRow> {
   String toString() {
     return (StringBuffer('HistoryRow(')
           ..write('id: $id, ')
+          ..write('workspaceId: $workspaceId, ')
           ..write('requestId: $requestId, ')
           ..write('method: $method, ')
           ..write('url: $url, ')
@@ -3043,6 +3620,7 @@ class HistoryRow extends DataClass implements Insertable<HistoryRow> {
   @override
   int get hashCode => Object.hash(
     id,
+    workspaceId,
     requestId,
     method,
     url,
@@ -3058,6 +3636,7 @@ class HistoryRow extends DataClass implements Insertable<HistoryRow> {
       identical(this, other) ||
       (other is HistoryRow &&
           other.id == this.id &&
+          other.workspaceId == this.workspaceId &&
           other.requestId == this.requestId &&
           other.method == this.method &&
           other.url == this.url &&
@@ -3071,6 +3650,7 @@ class HistoryRow extends DataClass implements Insertable<HistoryRow> {
 
 class HistoryEntriesCompanion extends UpdateCompanion<HistoryRow> {
   final Value<String> id;
+  final Value<String> workspaceId;
   final Value<String?> requestId;
   final Value<String> method;
   final Value<String> url;
@@ -3083,6 +3663,7 @@ class HistoryEntriesCompanion extends UpdateCompanion<HistoryRow> {
   final Value<int> rowid;
   const HistoryEntriesCompanion({
     this.id = const Value.absent(),
+    this.workspaceId = const Value.absent(),
     this.requestId = const Value.absent(),
     this.method = const Value.absent(),
     this.url = const Value.absent(),
@@ -3096,6 +3677,7 @@ class HistoryEntriesCompanion extends UpdateCompanion<HistoryRow> {
   });
   HistoryEntriesCompanion.insert({
     required String id,
+    this.workspaceId = const Value.absent(),
     this.requestId = const Value.absent(),
     required String method,
     required String url,
@@ -3113,6 +3695,7 @@ class HistoryEntriesCompanion extends UpdateCompanion<HistoryRow> {
        requestJson = Value(requestJson);
   static Insertable<HistoryRow> custom({
     Expression<String>? id,
+    Expression<String>? workspaceId,
     Expression<String>? requestId,
     Expression<String>? method,
     Expression<String>? url,
@@ -3126,6 +3709,7 @@ class HistoryEntriesCompanion extends UpdateCompanion<HistoryRow> {
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
+      if (workspaceId != null) 'workspace_id': workspaceId,
       if (requestId != null) 'request_id': requestId,
       if (method != null) 'method': method,
       if (url != null) 'url': url,
@@ -3141,6 +3725,7 @@ class HistoryEntriesCompanion extends UpdateCompanion<HistoryRow> {
 
   HistoryEntriesCompanion copyWith({
     Value<String>? id,
+    Value<String>? workspaceId,
     Value<String?>? requestId,
     Value<String>? method,
     Value<String>? url,
@@ -3154,6 +3739,7 @@ class HistoryEntriesCompanion extends UpdateCompanion<HistoryRow> {
   }) {
     return HistoryEntriesCompanion(
       id: id ?? this.id,
+      workspaceId: workspaceId ?? this.workspaceId,
       requestId: requestId ?? this.requestId,
       method: method ?? this.method,
       url: url ?? this.url,
@@ -3172,6 +3758,9 @@ class HistoryEntriesCompanion extends UpdateCompanion<HistoryRow> {
     final map = <String, Expression>{};
     if (id.present) {
       map['id'] = Variable<String>(id.value);
+    }
+    if (workspaceId.present) {
+      map['workspace_id'] = Variable<String>(workspaceId.value);
     }
     if (requestId.present) {
       map['request_id'] = Variable<String>(requestId.value);
@@ -3210,6 +3799,7 @@ class HistoryEntriesCompanion extends UpdateCompanion<HistoryRow> {
   String toString() {
     return (StringBuffer('HistoryEntriesCompanion(')
           ..write('id: $id, ')
+          ..write('workspaceId: $workspaceId, ')
           ..write('requestId: $requestId, ')
           ..write('method: $method, ')
           ..write('url: $url, ')
@@ -3852,6 +4442,7 @@ class SyncStatesCompanion extends UpdateCompanion<SyncStateRow> {
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
+  late final $WorkspacesTable workspaces = $WorkspacesTable(this);
   late final $CollectionsTable collections = $CollectionsTable(this);
   late final $FoldersTable folders = $FoldersTable(this);
   late final $RequestsTable requests = $RequestsTable(this);
@@ -3867,6 +4458,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
   List<DatabaseSchemaEntity> get allSchemaEntities => [
+    workspaces,
     collections,
     folders,
     requests,
@@ -3919,9 +4511,240 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       const DriftDatabaseOptions(storeDateTimeAsText: true);
 }
 
+typedef $$WorkspacesTableCreateCompanionBuilder =
+    WorkspacesCompanion Function({
+      required String id,
+      required String name,
+      Value<int> sortOrder,
+      Value<String?> activeEnvironmentId,
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$WorkspacesTableUpdateCompanionBuilder =
+    WorkspacesCompanion Function({
+      Value<String> id,
+      Value<String> name,
+      Value<int> sortOrder,
+      Value<String?> activeEnvironmentId,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$WorkspacesTableFilterComposer
+    extends Composer<_$AppDatabase, $WorkspacesTable> {
+  $$WorkspacesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get activeEnvironmentId => $composableBuilder(
+    column: $table.activeEnvironmentId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$WorkspacesTableOrderingComposer
+    extends Composer<_$AppDatabase, $WorkspacesTable> {
+  $$WorkspacesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get activeEnvironmentId => $composableBuilder(
+    column: $table.activeEnvironmentId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$WorkspacesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $WorkspacesTable> {
+  $$WorkspacesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<int> get sortOrder =>
+      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
+
+  GeneratedColumn<String> get activeEnvironmentId => $composableBuilder(
+    column: $table.activeEnvironmentId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$WorkspacesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $WorkspacesTable,
+          WorkspaceRow,
+          $$WorkspacesTableFilterComposer,
+          $$WorkspacesTableOrderingComposer,
+          $$WorkspacesTableAnnotationComposer,
+          $$WorkspacesTableCreateCompanionBuilder,
+          $$WorkspacesTableUpdateCompanionBuilder,
+          (
+            WorkspaceRow,
+            BaseReferences<_$AppDatabase, $WorkspacesTable, WorkspaceRow>,
+          ),
+          WorkspaceRow,
+          PrefetchHooks Function()
+        > {
+  $$WorkspacesTableTableManager(_$AppDatabase db, $WorkspacesTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$WorkspacesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$WorkspacesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$WorkspacesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<String?> activeEnvironmentId = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => WorkspacesCompanion(
+                id: id,
+                name: name,
+                sortOrder: sortOrder,
+                activeEnvironmentId: activeEnvironmentId,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String name,
+                Value<int> sortOrder = const Value.absent(),
+                Value<String?> activeEnvironmentId = const Value.absent(),
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => WorkspacesCompanion.insert(
+                id: id,
+                name: name,
+                sortOrder: sortOrder,
+                activeEnvironmentId: activeEnvironmentId,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$WorkspacesTable, WorkspaceRow>(table),
+                  BaseReferences<_$AppDatabase, $WorkspacesTable, WorkspaceRow>(
+                    db,
+                    table,
+                    e,
+                  ),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$WorkspacesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $WorkspacesTable,
+      WorkspaceRow,
+      $$WorkspacesTableFilterComposer,
+      $$WorkspacesTableOrderingComposer,
+      $$WorkspacesTableAnnotationComposer,
+      $$WorkspacesTableCreateCompanionBuilder,
+      $$WorkspacesTableUpdateCompanionBuilder,
+      (
+        WorkspaceRow,
+        BaseReferences<_$AppDatabase, $WorkspacesTable, WorkspaceRow>,
+      ),
+      WorkspaceRow,
+      PrefetchHooks Function()
+    >;
 typedef $$CollectionsTableCreateCompanionBuilder =
     CollectionsCompanion Function({
       required String id,
+      Value<String> workspaceId,
       required String name,
       Value<String> description,
       Value<int> sortOrder,
@@ -3932,6 +4755,7 @@ typedef $$CollectionsTableCreateCompanionBuilder =
 typedef $$CollectionsTableUpdateCompanionBuilder =
     CollectionsCompanion Function({
       Value<String> id,
+      Value<String> workspaceId,
       Value<String> name,
       Value<String> description,
       Value<int> sortOrder,
@@ -3993,6 +4817,11 @@ class $$CollectionsTableFilterComposer
   });
   ColumnFilters<String> get id => $composableBuilder(
     column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get workspaceId => $composableBuilder(
+    column: $table.workspaceId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4086,6 +4915,11 @@ class $$CollectionsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get workspaceId => $composableBuilder(
+    column: $table.workspaceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get name => $composableBuilder(
     column: $table.name,
     builder: (column) => ColumnOrderings(column),
@@ -4123,6 +4957,11 @@ class $$CollectionsTableAnnotationComposer
   });
   GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get workspaceId => $composableBuilder(
+    column: $table.workspaceId,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<String> get name =>
       $composableBuilder(column: $table.name, builder: (column) => column);
@@ -4221,6 +5060,7 @@ class $$CollectionsTableTableManager
           updateCompanionCallback:
               ({
                 Value<String> id = const Value.absent(),
+                Value<String> workspaceId = const Value.absent(),
                 Value<String> name = const Value.absent(),
                 Value<String> description = const Value.absent(),
                 Value<int> sortOrder = const Value.absent(),
@@ -4229,6 +5069,7 @@ class $$CollectionsTableTableManager
                 Value<int> rowid = const Value.absent(),
               }) => CollectionsCompanion(
                 id: id,
+                workspaceId: workspaceId,
                 name: name,
                 description: description,
                 sortOrder: sortOrder,
@@ -4239,6 +5080,7 @@ class $$CollectionsTableTableManager
           createCompanionCallback:
               ({
                 required String id,
+                Value<String> workspaceId = const Value.absent(),
                 required String name,
                 Value<String> description = const Value.absent(),
                 Value<int> sortOrder = const Value.absent(),
@@ -4247,6 +5089,7 @@ class $$CollectionsTableTableManager
                 Value<int> rowid = const Value.absent(),
               }) => CollectionsCompanion.insert(
                 id: id,
+                workspaceId: workspaceId,
                 name: name,
                 description: description,
                 sortOrder: sortOrder,
@@ -5480,6 +6323,7 @@ typedef $$RequestsTableProcessedTableManager =
 typedef $$EnvironmentsTableCreateCompanionBuilder =
     EnvironmentsCompanion Function({
       required String id,
+      Value<String> workspaceId,
       required String name,
       Value<bool> isGlobal,
       Value<int> sortOrder,
@@ -5490,6 +6334,7 @@ typedef $$EnvironmentsTableCreateCompanionBuilder =
 typedef $$EnvironmentsTableUpdateCompanionBuilder =
     EnvironmentsCompanion Function({
       Value<String> id,
+      Value<String> workspaceId,
       Value<String> name,
       Value<bool> isGlobal,
       Value<int> sortOrder,
@@ -5532,6 +6377,11 @@ class $$EnvironmentsTableFilterComposer
   });
   ColumnFilters<String> get id => $composableBuilder(
     column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get workspaceId => $composableBuilder(
+    column: $table.workspaceId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5600,6 +6450,11 @@ class $$EnvironmentsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get workspaceId => $composableBuilder(
+    column: $table.workspaceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get name => $composableBuilder(
     column: $table.name,
     builder: (column) => ColumnOrderings(column),
@@ -5637,6 +6492,11 @@ class $$EnvironmentsTableAnnotationComposer
   });
   GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get workspaceId => $composableBuilder(
+    column: $table.workspaceId,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<String> get name =>
       $composableBuilder(column: $table.name, builder: (column) => column);
@@ -5708,6 +6568,7 @@ class $$EnvironmentsTableTableManager
           updateCompanionCallback:
               ({
                 Value<String> id = const Value.absent(),
+                Value<String> workspaceId = const Value.absent(),
                 Value<String> name = const Value.absent(),
                 Value<bool> isGlobal = const Value.absent(),
                 Value<int> sortOrder = const Value.absent(),
@@ -5716,6 +6577,7 @@ class $$EnvironmentsTableTableManager
                 Value<int> rowid = const Value.absent(),
               }) => EnvironmentsCompanion(
                 id: id,
+                workspaceId: workspaceId,
                 name: name,
                 isGlobal: isGlobal,
                 sortOrder: sortOrder,
@@ -5726,6 +6588,7 @@ class $$EnvironmentsTableTableManager
           createCompanionCallback:
               ({
                 required String id,
+                Value<String> workspaceId = const Value.absent(),
                 required String name,
                 Value<bool> isGlobal = const Value.absent(),
                 Value<int> sortOrder = const Value.absent(),
@@ -5734,6 +6597,7 @@ class $$EnvironmentsTableTableManager
                 Value<int> rowid = const Value.absent(),
               }) => EnvironmentsCompanion.insert(
                 id: id,
+                workspaceId: workspaceId,
                 name: name,
                 isGlobal: isGlobal,
                 sortOrder: sortOrder,
@@ -6158,6 +7022,7 @@ typedef $$EnvVariablesTableProcessedTableManager =
 typedef $$HistoryEntriesTableCreateCompanionBuilder =
     HistoryEntriesCompanion Function({
       required String id,
+      Value<String> workspaceId,
       Value<String?> requestId,
       required String method,
       required String url,
@@ -6172,6 +7037,7 @@ typedef $$HistoryEntriesTableCreateCompanionBuilder =
 typedef $$HistoryEntriesTableUpdateCompanionBuilder =
     HistoryEntriesCompanion Function({
       Value<String> id,
+      Value<String> workspaceId,
       Value<String?> requestId,
       Value<String> method,
       Value<String> url,
@@ -6195,6 +7061,11 @@ class $$HistoryEntriesTableFilterComposer
   });
   ColumnFilters<String> get id => $composableBuilder(
     column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get workspaceId => $composableBuilder(
+    column: $table.workspaceId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -6258,6 +7129,11 @@ class $$HistoryEntriesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get workspaceId => $composableBuilder(
+    column: $table.workspaceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get requestId => $composableBuilder(
     column: $table.requestId,
     builder: (column) => ColumnOrderings(column),
@@ -6315,6 +7191,11 @@ class $$HistoryEntriesTableAnnotationComposer
   });
   GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get workspaceId => $composableBuilder(
+    column: $table.workspaceId,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<String> get requestId =>
       $composableBuilder(column: $table.requestId, builder: (column) => column);
@@ -6388,6 +7269,7 @@ class $$HistoryEntriesTableTableManager
           updateCompanionCallback:
               ({
                 Value<String> id = const Value.absent(),
+                Value<String> workspaceId = const Value.absent(),
                 Value<String?> requestId = const Value.absent(),
                 Value<String> method = const Value.absent(),
                 Value<String> url = const Value.absent(),
@@ -6400,6 +7282,7 @@ class $$HistoryEntriesTableTableManager
                 Value<int> rowid = const Value.absent(),
               }) => HistoryEntriesCompanion(
                 id: id,
+                workspaceId: workspaceId,
                 requestId: requestId,
                 method: method,
                 url: url,
@@ -6414,6 +7297,7 @@ class $$HistoryEntriesTableTableManager
           createCompanionCallback:
               ({
                 required String id,
+                Value<String> workspaceId = const Value.absent(),
                 Value<String?> requestId = const Value.absent(),
                 required String method,
                 required String url,
@@ -6426,6 +7310,7 @@ class $$HistoryEntriesTableTableManager
                 Value<int> rowid = const Value.absent(),
               }) => HistoryEntriesCompanion.insert(
                 id: id,
+                workspaceId: workspaceId,
                 requestId: requestId,
                 method: method,
                 url: url,
@@ -6859,6 +7744,8 @@ typedef $$SyncStatesTableProcessedTableManager =
 class $AppDatabaseManager {
   final _$AppDatabase _db;
   $AppDatabaseManager(this._db);
+  $$WorkspacesTableTableManager get workspaces =>
+      $$WorkspacesTableTableManager(_db, _db.workspaces);
   $$CollectionsTableTableManager get collections =>
       $$CollectionsTableTableManager(_db, _db.collections);
   $$FoldersTableTableManager get folders =>

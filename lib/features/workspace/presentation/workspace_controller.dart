@@ -11,6 +11,7 @@ import '../../collections/domain/collection_models.dart';
 import '../../collections/presentation/collection_providers.dart';
 import '../../settings/data/settings_repository.dart';
 import '../../settings/domain/app_settings.dart';
+import '../../workspaces/presentation/workspace_providers.dart';
 import '../domain/workspace_models.dart';
 import 'response_controller.dart';
 
@@ -29,18 +30,50 @@ final requestTabProvider = Provider.family<RequestTab?, String>((ref, tabId) {
   return tab is RequestTab ? tab : null;
 });
 
+/// Open tabs of the active workspace. Tabs of other workspaces are parked in
+/// memory (unsaved drafts included) and come back when switching back.
 class WorkspaceController extends Notifier<WorkspaceState> {
   Timer? _persistTimer;
+  late String _workspaceId;
+  final _parked = <String, WorkspaceState>{};
 
   @override
   WorkspaceState build() {
+    _parked.clear();
+    _workspaceId = ref.read(activeWorkspaceIdProvider);
+    ref.listen(activeWorkspaceIdProvider, (_, next) => _switchWorkspace(next));
     ref.listen(collectionTreesProvider, (_, next) {
+      // While rescoping to another workspace the provider still holds the
+      // previous workspace's trees; syncing against them would unlink tabs.
+      if (next.isLoading) return;
       final trees = next.value;
       if (trees != null) _syncWithSavedRequests(trees);
     });
     ref.onDispose(() => _persistTimer?.cancel());
+    return _blankState();
+  }
+
+  static WorkspaceState _blankState() {
     final first = RequestTab(draft: ApiRequest());
     return WorkspaceState(tabs: [first], activeTabId: first.id);
+  }
+
+  void _switchWorkspace(String next) {
+    final previous = _workspaceId;
+    if (next == previous) return;
+    if (_persistTimer?.isActive ?? false) {
+      _persistTimer!.cancel();
+      _persist(previous, state);
+    }
+    _parked[previous] = state;
+    _workspaceId = next;
+    final parked = _parked.remove(next);
+    if (parked != null) {
+      state = parked;
+      return;
+    }
+    state = _blankState();
+    unawaited(_restoreTabs(next));
   }
 
   // ------------------------------------------------------------------ tabs
@@ -221,9 +254,15 @@ class WorkspaceController extends Notifier<WorkspaceState> {
 
   Future<void> restore(StartupBehavior behavior) async {
     if (behavior != StartupBehavior.restoreTabs) return;
+    await _restoreTabs(_workspaceId);
+  }
+
+  /// Reopens the saved requests that were open in [workspaceId], unless the
+  /// user started working in the meantime.
+  Future<void> _restoreTabs(String workspaceId) async {
     final json = await ref
         .read(settingsRepositoryProvider)
-        .readJson(SettingsRepository.workspaceKey);
+        .readJson(SettingsRepository.tabsKey(workspaceId));
     if (json == null) return;
     final repo = ref.read(collectionRepositoryProvider);
     final tabs = <WorkspaceTab>[];
@@ -239,7 +278,13 @@ class WorkspaceController extends Notifier<WorkspaceState> {
       tabs.add(tab);
       if (requestId == savedActive) activeId = tab.id;
     }
-    if (tabs.isEmpty) return;
+    final current = state.tabs;
+    final untouched =
+        current.length == 1 &&
+        current.single is RequestTab &&
+        !(current.single as RequestTab).isSaved &&
+        !current.single.isDirty;
+    if (tabs.isEmpty || workspaceId != _workspaceId || !untouched) return;
     _set(
       WorkspaceState(tabs: tabs, activeTabId: activeId ?? tabs.first.id),
       persist: false,
@@ -248,25 +293,30 @@ class WorkspaceController extends Notifier<WorkspaceState> {
 
   void _schedulePersist() {
     _persistTimer?.cancel();
-    _persistTimer = Timer(const Duration(milliseconds: 600), () {
-      final saved = state.tabs
-          .whereType<RequestTab>()
-          .where((t) => t.isSaved)
-          .toList();
-      final active = state.activeTab;
-      unawaited(
-        ref.read(settingsRepositoryProvider).writeJson(
-          SettingsRepository.workspaceKey,
-          {
-            'tabs': [
-              for (final t in saved) {'requestId': t.savedRequestId},
-            ],
-            if (active is RequestTab && active.isSaved)
-              'active': active.savedRequestId,
-          },
-        ),
-      );
-    });
+    _persistTimer = Timer(
+      const Duration(milliseconds: 600),
+      () => _persist(_workspaceId, state),
+    );
+  }
+
+  void _persist(String workspaceId, WorkspaceState snapshot) {
+    final saved = snapshot.tabs
+        .whereType<RequestTab>()
+        .where((t) => t.isSaved)
+        .toList();
+    final active = snapshot.activeTab;
+    unawaited(
+      ref.read(settingsRepositoryProvider).writeJson(
+        SettingsRepository.tabsKey(workspaceId),
+        {
+          'tabs': [
+            for (final t in saved) {'requestId': t.savedRequestId},
+          ],
+          if (active is RequestTab && active.isSaved)
+            'active': active.savedRequestId,
+        },
+      ),
+    );
   }
 
   // ---------------------------------------------------------------- helpers

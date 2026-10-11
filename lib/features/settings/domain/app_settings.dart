@@ -157,7 +157,6 @@ class AppSettings {
     this.historyEnabled = true,
     this.historyRetentionDays = AppConstants.defaultHistoryRetentionDays,
     this.historyMaxEntries = AppConstants.defaultHistoryMaxEntries,
-    this.activeEnvironmentId,
   });
 
   final ThemeMode themeMode;
@@ -168,7 +167,6 @@ class AppSettings {
   /// 0 = keep forever.
   final int historyRetentionDays;
   final int historyMaxEntries;
-  final String? activeEnvironmentId;
 
   AppSettings copyWith({
     ThemeMode? themeMode,
@@ -177,7 +175,6 @@ class AppSettings {
     bool? historyEnabled,
     int? historyRetentionDays,
     int? historyMaxEntries,
-    String? Function()? activeEnvironmentId,
   }) => AppSettings(
     themeMode: themeMode ?? this.themeMode,
     startupBehavior: startupBehavior ?? this.startupBehavior,
@@ -185,9 +182,6 @@ class AppSettings {
     historyEnabled: historyEnabled ?? this.historyEnabled,
     historyRetentionDays: historyRetentionDays ?? this.historyRetentionDays,
     historyMaxEntries: historyMaxEntries ?? this.historyMaxEntries,
-    activeEnvironmentId: activeEnvironmentId != null
-        ? activeEnvironmentId()
-        : this.activeEnvironmentId,
   );
 
   static const schemaVersion = 1;
@@ -200,7 +194,6 @@ class AppSettings {
     'historyEnabled': historyEnabled,
     'historyRetentionDays': historyRetentionDays,
     'historyMaxEntries': historyMaxEntries,
-    if (activeEnvironmentId != null) 'activeEnvironmentId': activeEnvironmentId,
   };
 
   factory AppSettings.fromJson(JsonMap json) => AppSettings(
@@ -222,6 +215,5 @@ class AppSettings {
     historyMaxEntries: json
         .integer('historyMaxEntries', AppConstants.defaultHistoryMaxEntries)
         .clamp(10, 100000),
-    activeEnvironmentId: json.strOrNull('activeEnvironmentId'),
   );
 }

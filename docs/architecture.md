@@ -38,10 +38,11 @@ ResponsePanel: body formatted in an isolate (formatResponseBody) → CodeView (v
 
 ## State management (Riverpod 3)
 
-- `workspaceProvider` (`WorkspaceController`) holds the tabs. A tab is either a `RequestTab` (draft + saved baseline used for dirty tracking) or an `EnvironmentTab`. Widgets watch narrow `select`ions such as `requestTabProvider(tabId).select(...)`, so typing in one field doesn't rebuild the whole app.
+- `activeWorkspaceIdProvider` (`features/workspaces`) is the selected workspace. The collection, environment and history repository providers watch it, so every stream provider rescopes when the user switches. The active environment is stored per workspace (`activeEnvironmentIdProvider`).
+- `workspaceProvider` (`WorkspaceController`, `features/workspace`) holds the tabs of the active workspace. On a switch the current tabs, unsaved drafts included, are parked in memory and the target workspace's parked tabs come back, or its saved tabs are reopened from settings. A tab is either a `RequestTab` (draft + saved baseline used for dirty tracking) or an `EnvironmentTab`. Widgets watch narrow `select`ions such as `requestTabProvider(tabId).select(...)`, so typing in one field doesn't rebuild the whole app.
 - `responseProvider(tabId)` is a per-tab family holding idle/loading/success/failure. A generation counter discards responses that arrive after a cancel or a newer send.
 - `collectionTreesProvider`, `environmentsProvider` and `historyProvider` stream from Drift, so the UI updates automatically after any write.
-- `settingsProvider` persists `AppSettings` (theme, network, history retention, active environment).
+- `settingsProvider` persists `AppSettings` (theme, network, history retention, startup).
 - `shellProvider` covers sidebar section, visibility and width.
 - Focus requests (Cmd+L / Cmd+K) are counters in providers, not global mutable state.
 

@@ -2,7 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/app_providers.dart';
 import '../../api_client/domain/services/variable_resolver.dart';
-import '../../settings/presentation/settings_controller.dart';
+import '../../workspaces/presentation/workspace_providers.dart';
 import '../domain/environment_models.dart';
 
 final environmentsProvider = StreamProvider<List<Environment>>(
@@ -15,7 +15,7 @@ final globalsEnvironmentProvider = Provider<Environment?>((ref) {
 });
 
 final activeEnvironmentProvider = Provider<Environment?>((ref) {
-  final id = ref.watch(settingsProvider.select((s) => s.activeEnvironmentId));
+  final id = ref.watch(activeEnvironmentIdProvider);
   if (id == null) return null;
   final envs = ref.watch(environmentsProvider).value ?? const [];
   return envs.where((e) => e.id == id && !e.isGlobal).firstOrNull;
