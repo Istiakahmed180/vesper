@@ -1,6 +1,6 @@
 # Authentication (Google sign-in)
 
-An account is optional. Vesper is fully usable offline without one. Sign-in goes through the `AuthRepository` interface (`lib/features/auth/domain/auth_repository.dart`), so another identity provider can replace Google without touching the UI.
+An account is optional. Vesper is fully usable offline without one. Only one account can be signed in at a time: `AuthController.signIn` refuses while GitHub is connected and `GitHubController.startConnect` refuses while signed in with Google, and the UI disables the other option. Sign-in goes through the `AuthRepository` interface (`lib/features/auth/domain/auth_repository.dart`), so another identity provider can replace Google without touching the UI.
 
 ## Flow
 

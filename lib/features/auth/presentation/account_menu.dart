@@ -5,14 +5,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/app_providers.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../github/presentation/github_card.dart';
 import '../../github/presentation/github_connect_dialog.dart';
 import '../../github/presentation/github_providers.dart';
-import '../domain/auth_models.dart';
 import 'account_card.dart';
 import 'auth_providers.dart';
 
-/// Activity-rail account button. Opens a menu with the Google account,
-/// GitHub connection, sign-in/out and a link to the account settings.
+/// Activity-rail account button. Opens a menu with the signed-in account
+/// (Google or GitHub, one at a time), sign-in/out and the account settings.
 class AccountMenuButton extends ConsumerStatefulWidget {
   const AccountMenuButton({super.key, required this.onOpenSettings});
 
@@ -42,66 +42,93 @@ class _AccountMenuButtonState extends ConsumerState<AccountMenuButton> {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final session = ref.watch(authSessionProvider).value;
+    final google = ref.watch(authSessionProvider).value;
+    final github = ref.watch(githubSessionProvider).value;
     final googleConfigured = ref.watch(authRepositoryProvider).isConfigured;
     final githubConfigured = ref.watch(appConfigProvider).isGitHubConfigured;
-    final github = ref.watch(githubSessionProvider).value;
     final signingIn = _signingIn != null;
+    final signedIn = google != null || github != null;
+
+    final (title, subtitle, Widget avatar) = switch ((google, github)) {
+      (final g?, _) => (
+        g.account.name.isEmpty ? g.account.email : g.account.name,
+        '${g.account.email}${g.offline ? ' · offline' : ''} · Google',
+        Avatar(
+          initials: g.account.initials,
+          url: g.account.pictureUrl,
+          size: 34,
+        ),
+      ),
+      (null, final h?) => (
+        h.account.name.isEmpty ? '@${h.account.login}' : h.account.name,
+        '@${h.account.login} · GitHub',
+        Avatar(
+          initials: h.account.login.isEmpty
+              ? '?'
+              : h.account.login[0].toUpperCase(),
+          url: h.account.avatarUrl,
+          size: 34,
+        ),
+      ),
+      _ => (
+        'Not signed in',
+        signingIn
+            ? 'Complete sign-in in your browser…'
+            : 'Vesper works fully offline without an account.',
+        Icon(Icons.account_circle_outlined, size: 34, color: colors.textMuted),
+      ),
+    };
 
     return MenuAnchor(
       controller: _menu,
       alignmentOffset: const Offset(48, -8),
       style: const MenuStyle(minimumSize: WidgetStatePropertyAll(Size(280, 0))),
       menuChildren: [
-        _Header(session: session, signingIn: signingIn),
+        _Header(avatar: avatar, title: title, subtitle: subtitle),
         const Divider(height: 9),
-        if (session == null && googleConfigured)
-          signingIn
-              ? MenuItemButton(
-                  leadingIcon: const Icon(Icons.close, size: 18),
-                  onPressed: _cancelSignIn,
-                  child: const Text('Cancel sign-in'),
-                )
-              : MenuItemButton(
-                  key: const ValueKey('account-sign-in'),
-                  leadingIcon: const Icon(Icons.login, size: 18),
-                  onPressed: _signIn,
-                  child: const Text('Sign in with Google'),
-                ),
-        if (githubConfigured)
-          github == null
-              ? MenuItemButton(
-                  leadingIcon: const Icon(Icons.hub_outlined, size: 18),
-                  onPressed: () => showGitHubConnectDialog(context),
-                  child: const Text('Connect GitHub…'),
-                )
-              : MenuItemButton(
-                  leadingIcon: Icon(
-                    Icons.hub_outlined,
-                    size: 18,
-                    color: colors.success,
+        // One account at a time: sign-in options only while signed out.
+        if (!signedIn) ...[
+          if (googleConfigured)
+            signingIn
+                ? MenuItemButton(
+                    leadingIcon: const Icon(Icons.close, size: 18),
+                    onPressed: _cancelSignIn,
+                    child: const Text('Cancel sign-in'),
+                  )
+                : MenuItemButton(
+                    key: const ValueKey('account-sign-in'),
+                    leadingIcon: const Icon(Icons.login, size: 18),
+                    onPressed: _signIn,
+                    child: const Text('Sign in with Google'),
                   ),
-                  onPressed: widget.onOpenSettings,
-                  child: Text('GitHub · @${github.account.login}'),
-                ),
+          if (githubConfigured && !signingIn)
+            MenuItemButton(
+              key: const ValueKey('account-github'),
+              leadingIcon: const Icon(Icons.hub_outlined, size: 18),
+              onPressed: () => showGitHubConnectDialog(context),
+              child: const Text('Sign in with GitHub…'),
+            ),
+        ],
         MenuItemButton(
           key: const ValueKey('account-settings'),
           leadingIcon: const Icon(Icons.manage_accounts_outlined, size: 18),
           onPressed: widget.onOpenSettings,
           child: const Text('Account settings…'),
         ),
-        if (session != null) ...[
+        if (signedIn) ...[
           const Divider(height: 9),
           MenuItemButton(
+            key: const ValueKey('account-sign-out'),
             leadingIcon: const Icon(Icons.logout, size: 18),
-            onPressed: () =>
-                confirmGoogleSignOut(context, ref, session.account.email),
-            child: const Text('Sign out'),
+            onPressed: () => google != null
+                ? confirmGoogleSignOut(context, ref, google.account.email)
+                : confirmGitHubDisconnect(context, ref),
+            child: Text(google != null ? 'Sign out' : 'Disconnect GitHub'),
           ),
         ],
       ],
       child: Tooltip(
-        message: session == null ? 'Account' : session.account.email,
+        message: signedIn ? subtitle : 'Account',
         preferBelow: false,
         child: InkWell(
           key: const ValueKey('account-button'),
@@ -118,16 +145,16 @@ class _AccountMenuButtonState extends ConsumerState<AccountMenuButton> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     ),
                   )
-                : session == null
-                ? Icon(
+                : signedIn
+                ? SizedBox(
+                    width: 26,
+                    height: 26,
+                    child: FittedBox(child: avatar),
+                  )
+                : Icon(
                     Icons.account_circle_outlined,
                     size: 22,
                     color: colors.textSecondary,
-                  )
-                : Avatar(
-                    initials: session.account.initials,
-                    url: session.account.pictureUrl,
-                    size: 26,
                   ),
           ),
         ),
@@ -137,44 +164,26 @@ class _AccountMenuButtonState extends ConsumerState<AccountMenuButton> {
 }
 
 class _Header extends StatelessWidget {
-  const _Header({required this.session, required this.signingIn});
+  const _Header({
+    required this.avatar,
+    required this.title,
+    required this.subtitle,
+  });
 
-  final AuthSession? session;
-  final bool signingIn;
+  final Widget avatar;
+  final String title;
+  final String subtitle;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final s = session;
-    final (title, subtitle) = s == null
-        ? (
-            'Not signed in',
-            signingIn
-                ? 'Complete sign-in in your browser…'
-                : 'Vesper works fully offline without an account.',
-          )
-        : (
-            s.account.name.isEmpty ? s.account.email : s.account.name,
-            '${s.account.email}${s.offline ? ' · offline' : ''}',
-          );
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 320),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
         child: Row(
           children: [
-            if (s == null)
-              Icon(
-                Icons.account_circle_outlined,
-                size: 34,
-                color: colors.textMuted,
-              )
-            else
-              Avatar(
-                initials: s.account.initials,
-                url: s.account.pictureUrl,
-                size: 34,
-              ),
+            avatar,
             const SizedBox(width: 10),
             Flexible(
               child: Column(

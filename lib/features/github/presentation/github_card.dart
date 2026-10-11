@@ -6,9 +6,26 @@ import '../../../core/di/app_providers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/dialogs.dart';
 import '../../auth/presentation/account_card.dart';
+import '../../auth/presentation/auth_providers.dart';
 import '../../sync/presentation/sync_dialog.dart';
 import 'github_connect_dialog.dart';
 import 'github_providers.dart';
+
+/// Asks for confirmation, then removes the GitHub connection.
+Future<void> confirmGitHubDisconnect(
+  BuildContext context,
+  WidgetRef ref,
+) async {
+  final ok = await confirmDialog(
+    context,
+    title: 'Disconnect GitHub',
+    message:
+        'Remove the GitHub token from this computer? To fully revoke access, also remove Vesper '
+        'under GitHub → Settings → Applications.',
+    confirmLabel: 'Disconnect',
+  );
+  if (ok) await ref.read(githubSessionProvider.notifier).disconnect();
+}
 
 /// GitHub connection status, repository selection and disconnect.
 class GitHubCard extends ConsumerWidget {
@@ -71,6 +88,19 @@ class GitHubCard extends ConsumerWidget {
       );
     }
     final s = session.value;
+    final google = ref.watch(authSessionProvider).value;
+    if (s == null && google != null) {
+      return row(
+        leading: Icon(Icons.hub_outlined, size: 30, color: colors.textMuted),
+        title: 'Not available while signed in with Google',
+        subtitle:
+            'Only one account can be used at a time. Sign out of '
+            '${google.account.email} to connect GitHub.',
+        actions: const [
+          FilledButton(onPressed: null, child: Text('Connect GitHub')),
+        ],
+      );
+    }
     if (s == null) {
       return row(
         leading: Icon(Icons.hub_outlined, size: 30, color: colors.textMuted),
@@ -103,19 +133,7 @@ class GitHubCard extends ConsumerWidget {
               : 'Connected · scopes: ${s.scopes}',
           actions: [
             OutlinedButton(
-              onPressed: () async {
-                final ok = await confirmDialog(
-                  context,
-                  title: 'Disconnect GitHub',
-                  message:
-                      'Remove the GitHub token from this computer? To fully revoke access, also remove Vesper '
-                      'under GitHub → Settings → Applications.',
-                  confirmLabel: 'Disconnect',
-                );
-                if (ok) {
-                  await ref.read(githubSessionProvider.notifier).disconnect();
-                }
-              },
+              onPressed: () => confirmGitHubDisconnect(context, ref),
               child: const Text('Disconnect'),
             ),
           ],
