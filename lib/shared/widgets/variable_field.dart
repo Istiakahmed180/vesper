@@ -27,6 +27,7 @@ class VariableField extends ConsumerStatefulWidget {
     this.autofocus = false,
     this.enabled = true,
     this.suggestCredentials = true,
+    this.suggestions,
   });
 
   final String value;
@@ -44,6 +45,9 @@ class VariableField extends ConsumerStatefulWidget {
 
   /// Whether `{{` suggestions include token/password-like variables.
   final bool suggestCredentials;
+
+  /// Whole-value suggestions; see [VariableAutocomplete.suggestions].
+  final List<VariableSuggestion> Function(String text)? suggestions;
 
   @override
   ConsumerState<VariableField> createState() => _VariableFieldState();
@@ -128,6 +132,7 @@ class _VariableFieldState extends ConsumerState<VariableField> {
       focusNode: _focus,
       onChanged: widget.onChanged,
       hideCredentials: !widget.suggestCredentials,
+      suggestions: widget.suggestions,
       child: field,
     );
   }

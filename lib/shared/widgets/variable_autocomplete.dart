@@ -138,10 +138,15 @@ class VariableAutocomplete extends ConsumerStatefulWidget {
     required this.onChanged,
     required this.child,
     this.hideCredentials = false,
+    this.suggestions,
   });
 
   /// See [variableSuggestions].
   final bool hideCredentials;
+
+  /// Whole-value suggestions (e.g. header names) for [text], shown while no
+  /// `{{` is being typed; choosing one replaces the field's text.
+  final List<VariableSuggestion> Function(String text)? suggestions;
   final TextEditingController controller;
   final FocusNode focusNode;
   final ValueChanged<String> onChanged;
@@ -161,6 +166,12 @@ class _VariableAutocompleteState extends ConsumerState<VariableAutocomplete> {
 
   /// Token the user dismissed with Escape; hidden until they type more.
   VariableToken? _dismissed;
+
+  /// Whether the list shows [VariableAutocomplete.suggestions].
+  bool _plain = false;
+
+  /// Text whose plain suggestions were dismissed with Escape.
+  String? _dismissedPlain;
 
   /// Position of the list relative to the field (updated after layout).
   Offset? _anchor;
@@ -220,7 +231,16 @@ class _VariableAutocompleteState extends ConsumerState<VariableAutocomplete> {
         token.query != dismissed.query) {
       _dismissed = null;
     }
-    final options = token == null || _dismissed != null
+    if (_dismissedPlain != value.text) _dismissedPlain = null;
+    final plainSource = widget.suggestions;
+    final plain =
+        token == null &&
+        plainSource != null &&
+        widget.focusNode.hasFocus &&
+        _dismissedPlain == null;
+    final options = plain
+        ? plainSource(value.text)
+        : token == null || _dismissed != null
         ? const <VariableSuggestion>[]
         : variableSuggestions(
             token.query,
@@ -228,8 +248,10 @@ class _VariableAutocompleteState extends ConsumerState<VariableAutocomplete> {
             environmentName: ref.read(activeEnvironmentProvider)?.name,
             hideCredentials: widget.hideCredentials,
           );
-    final queryChanged = token?.query != _token?.query;
+    final queryChanged =
+        token?.query != _token?.query || plain != _plain || plain;
     setState(() {
+      _plain = plain;
       _token = token;
       _options = options;
       if (queryChanged || _highlighted >= options.length) _highlighted = 0;
@@ -255,8 +277,22 @@ class _VariableAutocompleteState extends ConsumerState<VariableAutocomplete> {
   });
 
   void _accept([int? index]) {
+    if (_options.isEmpty) return;
+    if (_plain) {
+      final name = _options[index ?? _highlighted].name;
+      final value = TextEditingValue(
+        text: name,
+        selection: TextSelection.collapsed(offset: name.length),
+      );
+      widget.controller.value = value;
+      widget.onChanged(name);
+      _dismissedPlain = name;
+      widget.focusNode.requestFocus();
+      _update();
+      return;
+    }
     final token = _token;
-    if (token == null || _options.isEmpty) return;
+    if (token == null) return;
     final choice = _options[index ?? _highlighted];
     final value = token.complete(widget.controller.text, choice.name);
     widget.controller.value = value;
@@ -265,7 +301,11 @@ class _VariableAutocompleteState extends ConsumerState<VariableAutocomplete> {
   }
 
   void _dismiss() {
-    _dismissed = _token;
+    if (_plain) {
+      _dismissedPlain = widget.controller.text;
+    } else {
+      _dismissed = _token;
+    }
     _update();
   }
 
@@ -324,6 +364,7 @@ class _VariableAutocompleteState extends ConsumerState<VariableAutocomplete> {
         link: _link,
         offset: _anchor ?? _fieldBottom(),
         options: _options,
+        plain: _plain,
         highlighted: _highlighted,
         onSelect: _accept,
         onHover: (i) => setState(() => _highlighted = i),
@@ -344,11 +385,15 @@ class _SuggestionList extends StatelessWidget {
     required this.highlighted,
     required this.onSelect,
     required this.onHover,
+    this.plain = false,
   });
 
   final LayerLink link;
   final Offset offset;
   final List<VariableSuggestion> options;
+
+  /// Plain values (header names) rather than `{{variables}}`.
+  final bool plain;
   final int highlighted;
   final ValueChanged<int> onSelect;
   final ValueChanged<int> onHover;
@@ -398,7 +443,9 @@ class _SuggestionList extends StatelessWidget {
                                 Text(
                                   options[i].name,
                                   style: mono.copyWith(
-                                    color: colors.variable,
+                                    color: plain
+                                        ? colors.textPrimary
+                                        : colors.variable,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),

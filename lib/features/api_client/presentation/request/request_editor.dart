@@ -7,17 +7,20 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/key_value_editor.dart';
 import '../../../../shared/widgets/section_tabs.dart';
 import '../../../../shared/widgets/split_view.dart';
+import '../../../../shared/widgets/variable_autocomplete.dart';
 import '../../../../shared/widgets/variable_scope.dart';
 import '../../../collections/presentation/collection_providers.dart';
 import '../../../environments/presentation/environment_providers.dart';
 import '../../../workspace/presentation/workspace_controller.dart';
 import '../../domain/models/request_auth.dart';
 import '../../domain/models/request_body.dart';
+import '../../domain/services/header_catalog.dart';
 import '../../domain/services/variable_resolver.dart';
 import '../response/response_panel.dart';
 import 'auth_editor.dart';
 import 'body_editor.dart';
 import 'cookies_view.dart';
+import 'default_headers.dart';
 import 'request_options_view.dart';
 import 'url_bar.dart';
 
@@ -415,31 +418,35 @@ class _HeadersSection extends ConsumerWidget {
   const _HeadersSection({required this.tabId});
   final String tabId;
 
+  static List<VariableSuggestion> _names(String text) => [
+    for (final (name, description) in HeaderCatalog.names(text))
+      VariableSuggestion(name, '', description),
+  ];
+
+  static List<VariableSuggestion> _values(String key, String text) => [
+    for (final v in HeaderCatalog.valuesFor(key, text))
+      VariableSuggestion(v, '', ''),
+  ];
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final headers =
         ref.watch(requestTabProvider(tabId).select((t) => t?.draft.headers)) ??
         const [];
-    final colors = context.colors;
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          DefaultHeaders(tabId: tabId),
           KeyValueEditor(
             rows: headers,
             keyHint: 'Header',
             maskSensitive: true,
+            keySuggestions: _names,
+            valueSuggestions: _values,
             onChanged: (rows) => ref
                 .read(workspaceProvider.notifier)
                 .updateDraft(tabId, (d) => d.copyWith(headers: rows)),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Text(
-              'Content-Type, User-Agent, Accept and authorization headers are added automatically '
-              'unless you set them here.',
-              style: TextStyle(fontSize: 11.5, color: colors.textMuted),
-            ),
           ),
         ],
       ),

@@ -112,9 +112,13 @@ void main() {
       await tester.enterText(find.byType(TextField).first, 'X-Trace');
       await tester.pump();
       expect(rows.single.key, 'X-Trace');
-      expect(find.byType(Checkbox), findsOneWidget);
+      // The row's checkbox (the header one switches all rows).
+      final rowCheckbox = find.byWidgetPredicate(
+        (w) => w is Checkbox && w.key != const ValueKey('all-rows-checkbox'),
+      );
+      expect(rowCheckbox, findsOneWidget);
 
-      await tester.tap(find.byType(Checkbox));
+      await tester.tap(rowCheckbox);
       await tester.pump();
       expect(rows.single.enabled, isFalse);
 

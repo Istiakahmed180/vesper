@@ -5,6 +5,8 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/id.dart';
 import '../../features/api_client/domain/models/key_value.dart';
+import 'all_rows_checkbox.dart';
+import 'variable_autocomplete.dart';
 import 'variable_field.dart';
 
 /// Editable key/value table with an always-present trailing "new row" and a
@@ -18,6 +20,8 @@ class KeyValueEditor extends StatefulWidget {
     this.valueHint = 'Value',
     this.maskSensitive = false,
     this.bulkSeparator = ':',
+    this.keySuggestions,
+    this.valueSuggestions,
   });
 
   final List<KeyValue> rows;
@@ -28,6 +32,13 @@ class KeyValueEditor extends StatefulWidget {
 
   /// Separator used in bulk edit ("key: value" for headers, "key=value" else).
   final String bulkSeparator;
+
+  /// Dropdown suggestions for the key column (e.g. header names).
+  final List<VariableSuggestion> Function(String text)? keySuggestions;
+
+  /// Dropdown suggestions for a value, given its row's key.
+  final List<VariableSuggestion> Function(String key, String text)?
+  valueSuggestions;
 
   @override
   State<KeyValueEditor> createState() => _KeyValueEditorState();
@@ -123,7 +134,17 @@ class _KeyValueEditorState extends State<KeyValueEditor> {
             ),
           )
         else ...[
-          _HeaderRow(keyHint: widget.keyHint, valueHint: widget.valueHint),
+          _HeaderRow(
+            keyHint: widget.keyHint,
+            valueHint: widget.valueHint,
+            leading: AllRowsCheckbox(
+              total: widget.rows.length,
+              enabled: widget.rows.where((r) => r.enabled).length,
+              onChanged: (on) => widget.onChanged([
+                for (final r in widget.rows) r.copyWith(enabled: on),
+              ]),
+            ),
+          ),
           for (final row in widget.rows)
             _KeyValueRow(
               key: ValueKey(row.id),
@@ -144,6 +165,8 @@ class _KeyValueEditorState extends State<KeyValueEditor> {
                     )
                   : null,
               revealed: _revealed.contains(row.id),
+              keySuggestions: widget.keySuggestions,
+              valueSuggestions: widget.valueSuggestions,
               onChanged: _update,
               onRemove: () => _remove(row.id),
             ),
@@ -153,6 +176,8 @@ class _KeyValueEditorState extends State<KeyValueEditor> {
             keyHint: widget.keyHint,
             valueHint: widget.valueHint,
             ghost: true,
+            keySuggestions: widget.keySuggestions,
+            valueSuggestions: widget.valueSuggestions,
             onChanged: _update,
           ),
           Divider(color: colors.border, height: 1),
@@ -163,9 +188,14 @@ class _KeyValueEditorState extends State<KeyValueEditor> {
 }
 
 class _HeaderRow extends StatelessWidget {
-  const _HeaderRow({required this.keyHint, required this.valueHint});
+  const _HeaderRow({
+    required this.keyHint,
+    required this.valueHint,
+    required this.leading,
+  });
   final String keyHint;
   final String valueHint;
+  final Widget leading;
 
   @override
   Widget build(BuildContext context) {
@@ -180,7 +210,7 @@ class _HeaderRow extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const SizedBox(width: 40),
+          SizedBox(width: 40, child: leading),
           Expanded(flex: 2, child: Text(keyHint.toUpperCase(), style: style)),
           Expanded(flex: 3, child: Text(valueHint.toUpperCase(), style: style)),
           const SizedBox(width: 64),
@@ -202,9 +232,14 @@ class _KeyValueRow extends StatefulWidget {
     this.obscure = false,
     this.onReveal,
     this.revealed = false,
+    this.keySuggestions,
+    this.valueSuggestions,
   });
 
   final KeyValue row;
+  final List<VariableSuggestion> Function(String text)? keySuggestions;
+  final List<VariableSuggestion> Function(String key, String text)?
+  valueSuggestions;
   final ValueChanged<KeyValue> onChanged;
   final VoidCallback? onRemove;
   final String keyHint;
@@ -257,6 +292,7 @@ class _KeyValueRowState extends State<_KeyValueRow> {
                   hint: widget.keyHint,
                   borderless: true,
                   monospace: true,
+                  suggestions: widget.keySuggestions,
                   onChanged: (v) => widget.onChanged(row.copyWith(key: v)),
                 ),
               ),
@@ -273,6 +309,9 @@ class _KeyValueRowState extends State<_KeyValueRow> {
                   borderless: true,
                   monospace: true,
                   obscure: widget.obscure,
+                  suggestions: widget.valueSuggestions == null
+                      ? null
+                      : (text) => widget.valueSuggestions!(row.key, text),
                   onChanged: (v) => widget.onChanged(row.copyWith(value: v)),
                 ),
               ),

@@ -11,15 +11,33 @@ import 'request_body.dart';
 /// Per-request overrides of the global network settings.
 @immutable
 class RequestOptions {
-  const RequestOptions({this.timeoutMs, this.followRedirects});
+  const RequestOptions({
+    this.timeoutMs,
+    this.followRedirects,
+    this.disabledDefaultHeaders = const {},
+  });
 
   /// null → use the global setting.
   final int? timeoutMs;
   final bool? followRedirects;
 
+  /// Lowercase names of default headers (User-Agent, Accept, Content-Type)
+  /// that are not added automatically.
+  final Set<String> disabledDefaultHeaders;
+
+  RequestOptions copyWith({Set<String>? disabledDefaultHeaders}) =>
+      RequestOptions(
+        timeoutMs: timeoutMs,
+        followRedirects: followRedirects,
+        disabledDefaultHeaders:
+            disabledDefaultHeaders ?? this.disabledDefaultHeaders,
+      );
+
   JsonMap toJson() => {
     if (timeoutMs != null) 'timeoutMs': timeoutMs,
     if (followRedirects != null) 'followRedirects': followRedirects,
+    if (disabledDefaultHeaders.isNotEmpty)
+      'disabledDefaultHeaders': disabledDefaultHeaders.toList()..sort(),
   };
 
   factory RequestOptions.fromJson(JsonMap json) => RequestOptions(
@@ -27,16 +45,27 @@ class RequestOptions {
     followRedirects: json['followRedirects'] is bool
         ? json['followRedirects']! as bool
         : null,
+    disabledDefaultHeaders: {
+      for (final v in json.list('disabledDefaultHeaders'))
+        if (v is String) v.toLowerCase(),
+    },
   );
+
+  static const _setEq = SetEquality<String>();
 
   @override
   bool operator ==(Object other) =>
       other is RequestOptions &&
       other.timeoutMs == timeoutMs &&
-      other.followRedirects == followRedirects;
+      other.followRedirects == followRedirects &&
+      _setEq.equals(other.disabledDefaultHeaders, disabledDefaultHeaders);
 
   @override
-  int get hashCode => Object.hash(timeoutMs, followRedirects);
+  int get hashCode => Object.hash(
+    timeoutMs,
+    followRedirects,
+    _setEq.hash(disabledDefaultHeaders),
+  );
 }
 
 @immutable
