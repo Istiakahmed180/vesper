@@ -631,7 +631,9 @@ class _AccountSettings extends StatelessWidget {
       _Group(
         title: 'GitHub',
         description:
-            'Store collections in a GitHub repository. Nothing is pushed without your confirmation.',
+            'Sign in with Google or GitHub; only one account can be used at a '
+            'time. GitHub also syncs collections with a repository, and nothing '
+            'is pushed without your confirmation.',
         children: [GitHubCard()],
       ),
     ],

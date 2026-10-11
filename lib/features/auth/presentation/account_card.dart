@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/errors/app_failure.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/dialogs.dart';
+import '../../github/presentation/github_providers.dart';
 import '../domain/auth_models.dart';
 import 'auth_providers.dart';
 
@@ -133,6 +134,18 @@ class _AccountCardState extends ConsumerState<AccountCard> {
         trailing: OutlinedButton(
           onPressed: () => confirmGoogleSignOut(context, ref, s.account.email),
           child: const Text('Sign out'),
+        ),
+      );
+    } else if (ref.watch(githubSessionProvider).value case final github?) {
+      content = _row(
+        icon: Icon(Icons.hub_outlined, size: 32, color: colors.textMuted),
+        title: 'Signed in with GitHub (@${github.account.login})',
+        subtitle:
+            'Only one account can be used at a time. Disconnect GitHub to '
+            'sign in with Google.',
+        trailing: const FilledButton(
+          onPressed: null,
+          child: Text('Sign in with Google'),
         ),
       );
     } else {

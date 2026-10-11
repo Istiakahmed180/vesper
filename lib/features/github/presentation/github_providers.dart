@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/app_providers.dart';
 import '../../../core/errors/app_failure.dart';
+import '../../auth/presentation/auth_providers.dart';
 import '../../settings/data/settings_repository.dart';
 import '../../workspaces/presentation/workspace_providers.dart';
 import '../data/github_api.dart';
@@ -35,7 +36,17 @@ class GitHubController extends AsyncNotifier<GitHubSession?> {
   Future<GitHubSession?> build() =>
       ref.watch(githubAuthRepositoryProvider).restore();
 
-  Future<DeviceCode> startConnect() => _repo.startDeviceFlow();
+  Future<DeviceCode> startConnect() async {
+    // Only one account at a time.
+    final google = await ref.read(authSessionProvider.future);
+    if (google != null) {
+      throw ValidationFailure(
+        'You are signed in with Google (${google.account.email}). '
+        'Sign out first to connect GitHub.',
+      );
+    }
+    return _repo.startDeviceFlow();
+  }
 
   Future<void> completeConnect(
     DeviceCode code, {

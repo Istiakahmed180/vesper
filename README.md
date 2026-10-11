@@ -20,7 +20,7 @@ It's a Postman alternative with its own design, code and assets. It can import P
 | cURL | Paste a cURL command into the URL bar or use **Import cURL**; **Copy as cURL** for any request |
 | Code snippets | **</>** next to Save: the request as cURL, raw HTTP, JavaScript (fetch), Node.js (Axios), Python (requests), Dart (http, Dio), Go, PHP, Swift, Java (OkHttp), C# (HttpClient) or PowerShell, with variables resolved and auth applied |
 | Import / export | Versioned Vesper JSON format; Postman Collection v2.0/2.1 and Postman environments; secrets are excluded unless you opt in |
-| Accounts | Sign in with Google (PKCE, optional backend exchange); GitHub connection via Device Flow |
+| Accounts | Sign in with Google (PKCE, optional backend exchange) or GitHub (Device Flow); one account at a time, and both are optional |
 | GitHub sync | Push and pull collections as JSON files in a repository you choose, with three-way conflict detection and an explicit confirmation for every write |
 | Desktop UX | Multiple tabs (reorder, middle-click close, duplicate), native macOS menu bar, Cmd/Ctrl shortcuts, context menus, resizable panes, dark/light themes, unsaved-change prompts |
 

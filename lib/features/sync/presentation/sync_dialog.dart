@@ -7,6 +7,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../shared/widgets/dialogs.dart';
 import '../../../shared/widgets/section_tabs.dart';
+import '../../auth/presentation/auth_providers.dart';
 import '../../github/data/github_api.dart';
 import '../../github/domain/github_models.dart';
 import '../../github/presentation/github_connect_dialog.dart';
@@ -151,6 +152,15 @@ class _SyncDialogState extends ConsumerState<_SyncDialog> {
       body = const SizedBox(
         height: 160,
         child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      );
+    } else if (session.value == null &&
+        ref.watch(authSessionProvider).value != null) {
+      body = const EmptyState(
+        icon: Icons.link_off,
+        title: 'GitHub sync is not available',
+        message:
+            'You are signed in with Google. Only one account can be used at a '
+            'time; sign out of Google to connect GitHub.',
       );
     } else if (session.value == null) {
       body = EmptyState(
