@@ -12,6 +12,7 @@ import '../../github/domain/github_models.dart';
 import '../../github/presentation/github_connect_dialog.dart';
 import '../../github/presentation/github_providers.dart';
 import '../../github/presentation/repo_picker.dart';
+import '../../workspaces/presentation/workspace_providers.dart';
 import '../data/sync_data.dart';
 import '../domain/sync_models.dart';
 import '../domain/sync_service.dart';
@@ -45,6 +46,7 @@ class _SyncDialogState extends ConsumerState<_SyncDialog> {
       api: ref.read(githubApiProvider),
       token: token,
       target: target,
+      workspaceId: ref.read(activeWorkspaceIdProvider),
     );
     final service = SyncService(
       collections: ref.read(collectionRepositoryProvider),

@@ -12,7 +12,7 @@ import 'package:vesper/core/di/app_providers.dart';
 import 'package:vesper/core/security/secret_vault.dart';
 import 'package:vesper/core/storage/app_database.dart';
 import 'package:vesper/features/environments/domain/environment_models.dart';
-import 'package:vesper/features/settings/presentation/settings_controller.dart';
+import 'package:vesper/features/workspaces/presentation/workspace_providers.dart';
 
 import '../test/support/test_server.dart';
 
@@ -137,7 +137,9 @@ void main() {
           'Development',
           variables: [EnvVariable(key: 'base_url', value: server.baseUrl)],
         );
-    container.read(settingsProvider.notifier).setActiveEnvironment(env.id);
+    await container
+        .read(activeWorkspaceIdProvider.notifier)
+        .setActiveEnvironment(env.id);
     await pumpUntil(tester, find.text('Development'));
     await tester.tap(urlField());
     await tester.enterText(urlField(), '{{base_url}}/large?bytes=1048576');

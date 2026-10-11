@@ -10,6 +10,7 @@ import '../../features/environments/domain/environment_repository.dart';
 import '../../features/history/data/drift_history_repository.dart';
 import '../../features/history/domain/history_repository.dart';
 import '../../features/settings/data/settings_repository.dart';
+import '../../features/workspaces/presentation/workspace_providers.dart';
 import '../config/app_config.dart';
 import '../logging/app_logger.dart';
 import '../oauth/oauth2_client.dart';
@@ -49,10 +50,13 @@ final httpClientProvider = Provider<HttpClientPort>((ref) {
   return client;
 });
 
+// Data repositories are scoped to the active workspace and rebuilt on switch.
+
 final collectionRepositoryProvider = Provider<CollectionRepository>(
   (ref) => DriftCollectionRepository(
     ref.watch(databaseProvider),
     ref.watch(vaultProvider),
+    workspaceId: ref.watch(activeWorkspaceIdProvider),
   ),
 );
 
@@ -60,11 +64,15 @@ final environmentRepositoryProvider = Provider<EnvironmentRepository>(
   (ref) => DriftEnvironmentRepository(
     ref.watch(databaseProvider),
     ref.watch(vaultProvider),
+    workspaceId: ref.watch(activeWorkspaceIdProvider),
   ),
 );
 
 final historyRepositoryProvider = Provider<HistoryRepository>(
-  (ref) => DriftHistoryRepository(ref.watch(databaseProvider)),
+  (ref) => DriftHistoryRepository(
+    ref.watch(databaseProvider),
+    workspaceId: ref.watch(activeWorkspaceIdProvider),
+  ),
 );
 
 final settingsRepositoryProvider = Provider<SettingsRepository>(

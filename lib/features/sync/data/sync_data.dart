@@ -53,14 +53,22 @@ class GitHubFileStore implements RemoteFileStore {
     required this.api,
     required this.token,
     required this.target,
+    this.workspaceId = defaultWorkspaceId,
   });
 
   final GitHubApi api;
   final String token;
   final SyncTarget target;
 
+  /// Sync records are kept per workspace, so two workspaces syncing with the
+  /// same repository never treat each other's collections as deleted. The
+  /// default workspace keeps the key used before workspaces existed.
+  final String workspaceId;
+
   @override
-  String get remoteKey => target.remoteKey;
+  String get remoteKey => workspaceId == defaultWorkspaceId
+      ? target.remoteKey
+      : '${target.remoteKey}#$workspaceId';
 
   @override
   Future<RemoteFileData?> read(String path) async {

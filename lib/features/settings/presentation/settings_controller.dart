@@ -27,7 +27,4 @@ class SettingsController extends Notifier<AppSettings> {
   void updateNetwork(
     NetworkSettings Function(NetworkSettings current) change,
   ) => update((s) => s.copyWith(network: change(s.network)));
-
-  void setActiveEnvironment(String? id) =>
-      update((s) => s.copyWith(activeEnvironmentId: () => id));
 }

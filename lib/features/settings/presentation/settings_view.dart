@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/di/app_providers.dart';
+import '../../../core/storage/app_database.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/dialogs.dart';
 import '../../auth/presentation/account_card.dart';
@@ -17,6 +18,7 @@ import '../../history/presentation/history_panel.dart';
 import '../../history/presentation/history_providers.dart';
 import '../../import_export/presentation/import_export_actions.dart';
 import '../../workspace/presentation/workspace_controller.dart';
+import '../../workspaces/presentation/workspace_providers.dart';
 import '../domain/app_settings.dart';
 import 'settings_controller.dart';
 
@@ -680,7 +682,7 @@ class _DataSettings extends ConsumerWidget {
             _Setting(
               title: 'Clear local database',
               subtitle:
-                  'Deletes all collections, environments, history, settings and stored secrets on this computer.',
+                  'Deletes all workspaces, collections, environments, history, settings and stored secrets on this computer.',
               trailing: FilledButton(
                 style: FilledButton.styleFrom(backgroundColor: colors.danger),
                 onPressed: () async {
@@ -688,11 +690,14 @@ class _DataSettings extends ConsumerWidget {
                     context,
                     title: 'Delete all local data?',
                     message:
-                        'All collections, environments, history, settings and secrets stored by Vesper on this computer will be permanently deleted. Export anything you want to keep first.',
+                        'All workspaces, collections, environments, history, settings and secrets stored by Vesper on this computer will be permanently deleted. Export anything you want to keep first.',
                     confirmLabel: 'Delete everything',
                   );
                   if (!ok || !context.mounted) return;
                   await guarded(context, () async {
+                    await ref
+                        .read(activeWorkspaceIdProvider.notifier)
+                        .select(defaultWorkspaceId);
                     await ref.read(databaseProvider).wipe();
                     await ref.read(vaultProvider).clear();
                     ref.read(cookieStoreProvider).clear();

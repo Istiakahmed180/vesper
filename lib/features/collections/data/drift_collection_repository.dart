@@ -10,10 +10,17 @@ import '../domain/collection_repository.dart';
 import 'request_row_mapper.dart';
 
 class DriftCollectionRepository implements CollectionRepository {
-  DriftCollectionRepository(this._db, this._vault);
+  DriftCollectionRepository(
+    this._db,
+    this._vault, {
+    this.workspaceId = defaultWorkspaceId,
+  });
 
   final AppDatabase _db;
   final SecretVault _vault;
+
+  /// Only collections of this workspace are read and created.
+  final String workspaceId;
   static const _mapper = RequestRowMapper();
 
   // ---------------------------------------------------------------- reading
@@ -30,14 +37,14 @@ class DriftCollectionRepository implements CollectionRepository {
       .asyncMap((_) => _loadTrees());
 
   Future<List<CollectionTree>> _loadTrees() async {
-    final cols =
-        await (_db.select(_db.collections)..orderBy([
-              (c) => OrderingTerm.asc(c.sortOrder),
-              (c) => OrderingTerm.asc(c.createdAt),
-            ]))
-            .get();
-    final folderRows = await _db.select(_db.folders).get();
-    final requestRows = await _db.select(_db.requests).get();
+    final cols = await _orderedCollections();
+    final ids = cols.map((c) => c.id).toList();
+    final folderRows = await (_db.select(
+      _db.folders,
+    )..where((f) => f.collectionId.isIn(ids))).get();
+    final requestRows = await (_db.select(
+      _db.requests,
+    )..where((r) => r.collectionId.isIn(ids))).get();
 
     final foldersByCollection = <String, List<Folder>>{};
     for (final f in folderRows) {
@@ -58,6 +65,15 @@ class DriftCollectionRepository implements CollectionRepository {
         ),
     ];
   }
+
+  Future<List<CollectionRow>> _orderedCollections() =>
+      (_db.select(_db.collections)
+            ..where((c) => c.workspaceId.equals(workspaceId))
+            ..orderBy([
+              (c) => OrderingTerm.asc(c.sortOrder),
+              (c) => OrderingTerm.asc(c.createdAt),
+            ]))
+          .get();
 
   static Collection _collection(CollectionRow c) => Collection(
     id: c.id,
@@ -124,17 +140,23 @@ class DriftCollectionRepository implements CollectionRepository {
     String name, {
     String description = '',
   }) async {
-    final max = await _maxSort(_db.collections, _db.collections.sortOrder);
+    final max = _db.collections.sortOrder.max();
+    final top =
+        await (_db.selectOnly(_db.collections)
+              ..addColumns([max])
+              ..where(_db.collections.workspaceId.equals(workspaceId)))
+            .getSingle();
     final c = Collection(
       name: _nonEmpty(name, 'New collection'),
       description: description,
-      sortOrder: max + 1,
+      sortOrder: (top.read(max) ?? -1) + 1,
     );
     await _db
         .into(_db.collections)
         .insert(
           CollectionsCompanion.insert(
             id: c.id,
+            workspaceId: Value(workspaceId),
             name: c.name,
             description: Value(c.description),
             sortOrder: Value(c.sortOrder),
@@ -189,12 +211,7 @@ class DriftCollectionRepository implements CollectionRepository {
   @override
   Future<void> reorderCollection(String id, int newIndex) =>
       _db.transaction(() async {
-        final rows =
-            await (_db.select(_db.collections)..orderBy([
-                  (c) => OrderingTerm.asc(c.sortOrder),
-                  (c) => OrderingTerm.asc(c.createdAt),
-                ]))
-                .get();
+        final rows = await _orderedCollections();
         final ids = rows.map((r) => r.id).toList();
         if (!ids.remove(id)) return;
         ids.insert(newIndex.clamp(0, ids.length), id);
@@ -203,6 +220,23 @@ class DriftCollectionRepository implements CollectionRepository {
               .write(CollectionsCompanion(sortOrder: Value(i)));
         }
       });
+
+  @override
+  Future<void> moveCollectionToWorkspace(String id, String workspaceId) async {
+    final max = _db.collections.sortOrder.max();
+    final top =
+        await (_db.selectOnly(_db.collections)
+              ..addColumns([max])
+              ..where(_db.collections.workspaceId.equals(workspaceId)))
+            .getSingle();
+    await (_db.update(_db.collections)..where((c) => c.id.equals(id))).write(
+      CollectionsCompanion(
+        workspaceId: Value(workspaceId),
+        sortOrder: Value((top.read(max) ?? -1) + 1),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
+  }
 
   // ---------------------------------------------------------------- folders
 
@@ -563,15 +597,6 @@ class DriftCollectionRepository implements CollectionRepository {
   }
 
   // ---------------------------------------------------------------- helpers
-
-  Future<int> _maxSort(
-    TableInfo<Table, Object?> table,
-    GeneratedColumn<int> column,
-  ) async {
-    final max = column.max();
-    final row = await (_db.selectOnly(table)..addColumns([max])).getSingle();
-    return row.read(max) ?? -1;
-  }
 
   Future<int> _nextSortInLocation(TreeLocation loc) async {
     final siblings = await _siblingOrders(loc);

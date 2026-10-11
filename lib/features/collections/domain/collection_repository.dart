@@ -40,6 +40,9 @@ abstract class CollectionRepository {
   Future<String> duplicateCollection(String id);
   Future<void> reorderCollection(String id, int newIndex);
 
+  /// Moves a collection with everything in it to another workspace.
+  Future<void> moveCollectionToWorkspace(String id, String workspaceId);
+
   Future<Folder> createFolder(
     String collectionId,
     String name, {

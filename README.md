@@ -12,6 +12,7 @@ It's a Postman alternative with its own design, code and assets. It can import P
 | Bodies | None, JSON (highlighting, validation, Beautify), Raw (Text/JSON/XML/HTML/JS), form-data with multipart file upload, x-www-form-urlencoded, binary file (drag & drop) |
 | Authorization | Bearer, Basic, API key (header or query), OAuth 2.0 (Authorization Code + PKCE via loopback, Client Credentials, refresh) |
 | Responses | Status, time, size; virtualized Pretty/Raw viewer with syntax highlighting, collapsible JSON/XML blocks, search, copy, save to file; image preview; open HTML in the browser; headers, cookies and redirect details |
+| Workspaces | Separate workspaces (e.g. per project or client), each with its own collections, environments, Globals, history, open tabs and GitHub sync target; switch from the sidebar header, move collections between workspaces |
 | Collections | Collections → nested folders → requests; create, rename, duplicate, delete (with confirmation), drag-and-drop move and reorder, search |
 | Environments | Globals + environments, `{{variables}}` in URL/headers/body/auth, nested variables, `{{$guid}}`/`{{$timestamp}}`/`{{$isoTimestamp}}`/`{{$randomInt}}`, secret variables kept in the keychain, live variable preview |
 | History | Every sent request (sanitized: no secrets), grouped by day, re-run, delete, clear, configurable retention |
@@ -42,7 +43,9 @@ The code is organized by feature, and each feature is split into `domain` (pure 
 lib/
   core/        config, constants, di, errors, logging, network, oauth, security, storage, theme, utils
   features/    api_client, auth, collections, environments, github, history,
-               import_export, settings, sync, workspace
+               import_export, settings, sync,
+               workspace (main window: tabs, sidebar, shell),
+               workspaces (workspace list, switcher, active workspace)
   shared/      reusable widgets (code view/editor, key-value editor, split view, dialogs…)
   app.dart     MaterialApp + theme
   main.dart    composition root: window, logging, database, provider overrides

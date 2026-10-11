@@ -9,7 +9,7 @@ import '../../../core/utils/id.dart';
 import '../../../core/utils/platform_keys.dart';
 import '../../../shared/widgets/dialogs.dart';
 import '../../../shared/widgets/section_tabs.dart';
-import '../../settings/presentation/settings_controller.dart';
+import '../../workspaces/presentation/workspace_providers.dart';
 import '../domain/environment_models.dart';
 import 'environment_providers.dart';
 
@@ -84,9 +84,7 @@ class _EnvironmentEditorState extends ConsumerState<EnvironmentEditor> {
       _load(env);
     }
 
-    final activeId = ref.watch(
-      settingsProvider.select((s) => s.activeEnvironmentId),
-    );
+    final activeId = ref.watch(activeEnvironmentIdProvider);
     final isActive = activeId == env.id;
 
     return CallbackShortcuts(
@@ -135,7 +133,7 @@ class _EnvironmentEditorState extends ConsumerState<EnvironmentEditor> {
                   if (!env.isGlobal)
                     OutlinedButton(
                       onPressed: () => ref
-                          .read(settingsProvider.notifier)
+                          .read(activeWorkspaceIdProvider.notifier)
                           .setActiveEnvironment(isActive ? null : env.id),
                       child: Text(isActive ? 'Deactivate' : 'Set active'),
                     ),
