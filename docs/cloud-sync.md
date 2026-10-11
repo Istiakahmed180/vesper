@@ -14,10 +14,12 @@ values in their place, so a new computer needs tokens to be entered again.
 2. **Authentication → Sign In / Providers → Google:** enable it. Under
    **Client IDs** add the Google desktop client ID used for `GOOGLE_CLIENT_ID`,
    and enter that client's secret.
-3. **SQL Editor:** run `supabase/migrations/0001_vesper_sync.sql`, then
-   `0002_team_workspaces.sql` (team workspaces). It creates
-   the `sync_items` table, Row Level Security policies (each user only sees
-   their own rows), the last-write-wins trigger and the realtime publication.
+3. **SQL Editor:** run the files in `supabase/migrations` in order:
+   `0001_vesper_sync.sql` (the `sync_items` table, Row Level Security so each
+   user only sees their own rows, the last-write-wins trigger and the
+   realtime publication), `0002_team_workspaces.sql` (team workspaces) and
+   `0003_restrict_functions.sql` (team functions callable by signed-in users
+   only).
 4. **Project Settings → API Keys:** put the project URL and the anon /
    publishable key in `.env`:
    ```
@@ -92,7 +94,9 @@ accepts the invite (`accept_workspace_invites`).
   removed from their old space. A deletion from the old space is not applied
   on the owner's other devices while the item lives in the shared space.
 - Every sync first refreshes memberships; a workspace the user left or was
-  removed from disappears from their computer.
+  removed from disappears from their computer. A one-time notice tells a
+  member when a workspace was shared with them (remembered per user in
+  `cloud.seen_workspaces.<userId>`).
 - Each space has its own pull cursor (`cloud.cursor`, `cloud.cursor.<id>`).
 
 Code: `lib/features/cloud_sync/` (engine and models in `domain`, Drift and
