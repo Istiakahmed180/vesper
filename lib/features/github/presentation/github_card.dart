@@ -7,6 +7,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/dialogs.dart';
 import '../../auth/presentation/account_card.dart';
 import '../../auth/presentation/auth_providers.dart';
+import '../../cloud_sync/presentation/cloud_sync_widgets.dart';
 import '../../sync/presentation/sync_dialog.dart';
 import 'github_connect_dialog.dart';
 import 'github_providers.dart';
@@ -20,11 +21,15 @@ Future<void> confirmGitHubDisconnect(
     context,
     title: 'Disconnect GitHub',
     message:
-        'Remove the GitHub token from this computer? To fully revoke access, also remove Vesper '
+        'Sign out of GitHub and remove its token from this computer? '
+        '${signOutDataNote(ref)} To fully revoke access, also remove Vesper '
         'under GitHub → Settings → Applications.',
     confirmLabel: 'Disconnect',
   );
-  if (ok) await ref.read(githubSessionProvider.notifier).disconnect();
+  if (!ok || !context.mounted || !await uploadBeforeSignOut(context, ref)) {
+    return;
+  }
+  await ref.read(githubSessionProvider.notifier).disconnect();
 }
 
 /// GitHub connection status, repository selection and disconnect.

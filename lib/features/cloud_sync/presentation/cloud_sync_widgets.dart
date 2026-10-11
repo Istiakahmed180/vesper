@@ -192,6 +192,51 @@ class CloudSyncCard extends ConsumerWidget {
   }
 }
 
+/// Text for sign-out confirmations: what happens to this computer's data.
+String signOutDataNote(WidgetRef ref) => ref.read(cloudSyncProvider).isActive
+    ? 'Your workspaces and collections are removed from this computer and '
+          'come back when you sign in again.'
+    : 'Your local collections stay on this computer.';
+
+/// Uploads pending changes before signing out. Returns false when changes
+/// could not be uploaded and the user chose to stay signed in.
+Future<bool> uploadBeforeSignOut(BuildContext context, WidgetRef ref) async {
+  final remaining = await ref
+      .read(cloudSyncProvider.notifier)
+      .flushBeforeSignOut();
+  if (remaining == 0 || !context.mounted) return true;
+  final result = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Changes not uploaded'),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 440),
+        child: Text(
+          '$remaining change(s) could not be uploaded, probably because you '
+          'are offline. If you sign out now they are lost. Connect to the '
+          'internet and try again to keep them.',
+          style: TextStyle(fontSize: 13, color: context.colors.textSecondary),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, true),
+          child: Text(
+            'Sign out anyway',
+            style: TextStyle(color: context.colors.danger),
+          ),
+        ),
+        FilledButton(
+          autofocus: true,
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('Stay signed in'),
+        ),
+      ],
+    ),
+  );
+  return result ?? false;
+}
+
 enum _AccountChoice { replace, merge, signOut }
 
 /// Asks what to do with data from a different account on this computer.

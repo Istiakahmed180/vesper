@@ -54,6 +54,17 @@ other device ◄─ realtime ping ◄─ Supabase ◄────────┘
   stored version.
 - **Triggers for syncing:** 1.5 s after local changes, on realtime pings from
   other devices, every 60 s, and from "Sync now".
+- **Signing out** first uploads pending changes (warning if some cannot be
+  uploaded), then removes the account's workspaces, collections,
+  environments and history from the computer, leaving an empty
+  "My Workspace". Vault secrets stay: they are keyed by item id, so tokens
+  reattach when the next sign-in downloads the items again. Another account
+  signing in on a cleared computer takes over silently and the previous
+  account's secrets are removed.
+- **GitHub sign-in** goes through Supabase as well (browser, PKCE, loopback
+  redirect `http://127.0.0.1:*/**`); the GitHub token Supabase returns also
+  powers repository sync. Builds without a Supabase project keep the Device
+  Flow.
 - **First sign-in** on a computer uploads its existing data into the account.
   Signing in with a different account than the one whose data is on the
   computer pauses sync and asks: replace the local data with the account's,

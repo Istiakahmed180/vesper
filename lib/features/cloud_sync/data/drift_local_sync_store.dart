@@ -125,6 +125,21 @@ class DriftLocalSyncStore implements LocalSyncStore {
         SettingsEntriesCompanion.insert(key: cursorKey, value: _iso(cursor)),
       );
 
+  /// Whether this computer holds anything worth keeping: collections,
+  /// environments with variables, history or extra workspaces.
+  Future<bool> hasContent() async {
+    final rows = await _db.customSelect('''
+      SELECT
+        (SELECT COUNT(*) FROM collections) +
+        (SELECT COUNT(*) FROM environments WHERE is_global = 0) +
+        (SELECT COUNT(*) FROM env_variables) +
+        (SELECT COUNT(*) FROM history_entries) +
+        (SELECT COUNT(*) FROM workspaces WHERE id <> '$defaultWorkspaceId')
+      AS n
+    ''').getSingle();
+    return rows.read<int>('n') > 0;
+  }
+
   /// Forgets the cursor and pending changes (sign-out of another account).
   Future<void> reset() async {
     await _db.delete(_db.syncOutbox).go();

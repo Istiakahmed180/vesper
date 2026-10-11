@@ -267,4 +267,30 @@ void main() {
       isEmpty,
     );
   });
+
+  test('signing out clears the computer; signing in brings everything back '
+      'with its secrets', () async {
+    final c = await a.collections().createCollection('Account data');
+    final r = await a.collections().saveRequest(
+      ApiRequest(
+        collectionId: c.id,
+        auth: const BearerAuth(token: 'kept'),
+      ),
+    );
+    await a.engine.sync();
+    expect(await a.store.hasContent(), isTrue);
+
+    // What sign-out does.
+    await a.db.wipeContent();
+    await a.store.reset();
+    expect(await a.store.hasContent(), isFalse);
+    expect(await a.collectionNames(), isEmpty);
+
+    // Signing in again: a full pull.
+    await a.engine.sync();
+    expect(await a.collectionNames(), ['Account data']);
+    final restored = await a.collections().getRequest(r.id);
+    expect(restored!.auth, const BearerAuth(token: 'kept'));
+    expect(cloud.items.values.where((i) => i.deleted), isEmpty);
+  });
 }

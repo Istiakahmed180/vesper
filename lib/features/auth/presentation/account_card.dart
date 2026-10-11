@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/errors/app_failure.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/dialogs.dart';
+import '../../cloud_sync/presentation/cloud_sync_widgets.dart';
 import '../../github/presentation/github_providers.dart';
 import '../domain/auth_models.dart';
 import 'auth_providers.dart';
@@ -77,12 +78,14 @@ Future<void> confirmGoogleSignOut(
   final ok = await confirmDialog(
     context,
     title: 'Sign out',
-    message:
-        'Sign out of $email? Your local collections stay on this computer.',
+    message: 'Sign out of $email? ${signOutDataNote(ref)}',
     confirmLabel: 'Sign out',
     destructive: false,
   );
-  if (ok) await ref.read(authSessionProvider.notifier).signOut();
+  if (!ok || !context.mounted || !await uploadBeforeSignOut(context, ref)) {
+    return;
+  }
+  await ref.read(authSessionProvider.notifier).signOut();
 }
 
 /// Google account status, sign-in and sign-out.

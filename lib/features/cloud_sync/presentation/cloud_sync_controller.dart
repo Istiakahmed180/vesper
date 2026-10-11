@@ -156,6 +156,13 @@ class CloudSyncController extends Notifier<CloudSyncState> {
       final settings = ref.read(settingsRepositoryProvider);
       final owner = await settings.read(ownerIdKey);
       if (owner != null && owner != user.id) {
+        // Nothing of the previous account is on this computer any more
+        // (signing out removes it): take over without asking.
+        if (!await _local!.hasContent()) {
+          await _adopt(user, merge: false);
+          _start();
+          return;
+        }
         state = CloudSyncState(
           CloudSyncPhase.accountChanged,
           previousAccount:
@@ -290,11 +297,36 @@ class CloudSyncController extends Notifier<CloudSyncState> {
     }
   }
 
+  /// Uploads pending changes before signing out. Returns how many local
+  /// changes could not be uploaded (they are lost if the user signs out).
+  Future<int> flushBeforeSignOut() async {
+    final engine = _engine;
+    if (engine == null || !state.isActive) return 0;
+    try {
+      await engine.push().timeout(const Duration(seconds: 15));
+    } catch (_) {
+      // Counted below.
+    }
+    return (await _local!.pending()).length;
+  }
+
+  /// Signing out removes the account's data from this computer; it stays in
+  /// the cloud and comes back at the next sign-in. Vault secrets are kept:
+  /// they are keyed by item id and reattach when the items return.
   Future<void> _disconnect() async {
+    final wasSyncing = state.isActive;
     _generation++;
     _connectedAs = null;
     _stopListening();
     await _auth?.signOut();
+    if (wasSyncing) {
+      await ref
+          .read(activeWorkspaceIdProvider.notifier)
+          .select(defaultWorkspaceId);
+      await ref.read(databaseProvider).wipeContent();
+      await _local!.reset();
+      ref.invalidate(workspaceProvider);
+    }
     state = const CloudSyncState(CloudSyncPhase.signedOut);
   }
 
