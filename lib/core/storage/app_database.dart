@@ -179,6 +179,19 @@ class SyncOutbox extends Table {
   Set<Column<Object>> get primaryKey => {kind, itemId};
 }
 
+/// Where each item was last stored in the cloud: a shared workspace id, or
+/// null for the user's personal space. Used to address deletions and items
+/// that moved between spaces.
+@DataClassName('SyncScopeRow')
+class SyncScopes extends Table {
+  TextColumn get kind => text()();
+  TextColumn get itemId => text()();
+  TextColumn get workspaceId => text().nullable()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {kind, itemId};
+}
+
 /// While a row exists here the change-tracking triggers are silent (used when
 /// applying cloud changes and when wiping the database).
 @DataClassName('SyncFlagRow')
@@ -206,6 +219,7 @@ String globalsEnvironmentId(String workspaceId) => 'globals-$workspaceId';
     SyncStates,
     SyncOutbox,
     SyncFlags,
+    SyncScopes,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -222,7 +236,7 @@ class AppDatabase extends _$AppDatabase {
 
   /// Bump when the schema changes and add a step in [migration].
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -239,6 +253,7 @@ class AppDatabase extends _$AppDatabase {
         await m.addColumn(collections, collections.variablesJson);
       }
       if (from < 4) await _migrateToCloudSync(m);
+      if (from < 5) await m.createTable(syncScopes);
     },
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = ON');
@@ -423,6 +438,7 @@ class AppDatabase extends _$AppDatabase {
       workspaces,
       syncStates,
       syncOutbox,
+      syncScopes,
     ]) {
       await delete(table).go();
     }

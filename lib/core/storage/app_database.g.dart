@@ -4961,6 +4961,277 @@ class SyncFlagsCompanion extends UpdateCompanion<SyncFlagRow> {
   }
 }
 
+class $SyncScopesTable extends SyncScopes
+    with TableInfo<$SyncScopesTable, SyncScopeRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SyncScopesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _kindMeta = const VerificationMeta('kind');
+  @override
+  late final GeneratedColumn<String> kind = GeneratedColumn<String>(
+    'kind',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _itemIdMeta = const VerificationMeta('itemId');
+  @override
+  late final GeneratedColumn<String> itemId = GeneratedColumn<String>(
+    'item_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _workspaceIdMeta = const VerificationMeta(
+    'workspaceId',
+  );
+  @override
+  late final GeneratedColumn<String> workspaceId = GeneratedColumn<String>(
+    'workspace_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [kind, itemId, workspaceId];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'sync_scopes';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<SyncScopeRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('kind')) {
+      context.handle(
+        _kindMeta,
+        kind.isAcceptableOrUnknown(data['kind']!, _kindMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_kindMeta);
+    }
+    if (data.containsKey('item_id')) {
+      context.handle(
+        _itemIdMeta,
+        itemId.isAcceptableOrUnknown(data['item_id']!, _itemIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_itemIdMeta);
+    }
+    if (data.containsKey('workspace_id')) {
+      context.handle(
+        _workspaceIdMeta,
+        workspaceId.isAcceptableOrUnknown(
+          data['workspace_id']!,
+          _workspaceIdMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {kind, itemId};
+  @override
+  SyncScopeRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return SyncScopeRow(
+      kind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}kind'],
+      )!,
+      itemId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}item_id'],
+      )!,
+      workspaceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}workspace_id'],
+      ),
+    );
+  }
+
+  @override
+  $SyncScopesTable createAlias(String alias) {
+    return $SyncScopesTable(attachedDatabase, alias);
+  }
+}
+
+class SyncScopeRow extends DataClass implements Insertable<SyncScopeRow> {
+  final String kind;
+  final String itemId;
+  final String? workspaceId;
+  const SyncScopeRow({
+    required this.kind,
+    required this.itemId,
+    this.workspaceId,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['kind'] = Variable<String>(kind);
+    map['item_id'] = Variable<String>(itemId);
+    if (!nullToAbsent || workspaceId != null) {
+      map['workspace_id'] = Variable<String>(workspaceId);
+    }
+    return map;
+  }
+
+  SyncScopesCompanion toCompanion(bool nullToAbsent) {
+    return SyncScopesCompanion(
+      kind: Value(kind),
+      itemId: Value(itemId),
+      workspaceId: workspaceId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(workspaceId),
+    );
+  }
+
+  factory SyncScopeRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return SyncScopeRow(
+      kind: serializer.fromJson<String>(json['kind']),
+      itemId: serializer.fromJson<String>(json['itemId']),
+      workspaceId: serializer.fromJson<String?>(json['workspaceId']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'kind': serializer.toJson<String>(kind),
+      'itemId': serializer.toJson<String>(itemId),
+      'workspaceId': serializer.toJson<String?>(workspaceId),
+    };
+  }
+
+  SyncScopeRow copyWith({
+    String? kind,
+    String? itemId,
+    Value<String?> workspaceId = const Value.absent(),
+  }) => SyncScopeRow(
+    kind: kind ?? this.kind,
+    itemId: itemId ?? this.itemId,
+    workspaceId: workspaceId.present ? workspaceId.value : this.workspaceId,
+  );
+  SyncScopeRow copyWithCompanion(SyncScopesCompanion data) {
+    return SyncScopeRow(
+      kind: data.kind.present ? data.kind.value : this.kind,
+      itemId: data.itemId.present ? data.itemId.value : this.itemId,
+      workspaceId: data.workspaceId.present
+          ? data.workspaceId.value
+          : this.workspaceId,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SyncScopeRow(')
+          ..write('kind: $kind, ')
+          ..write('itemId: $itemId, ')
+          ..write('workspaceId: $workspaceId')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(kind, itemId, workspaceId);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SyncScopeRow &&
+          other.kind == this.kind &&
+          other.itemId == this.itemId &&
+          other.workspaceId == this.workspaceId);
+}
+
+class SyncScopesCompanion extends UpdateCompanion<SyncScopeRow> {
+  final Value<String> kind;
+  final Value<String> itemId;
+  final Value<String?> workspaceId;
+  final Value<int> rowid;
+  const SyncScopesCompanion({
+    this.kind = const Value.absent(),
+    this.itemId = const Value.absent(),
+    this.workspaceId = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  SyncScopesCompanion.insert({
+    required String kind,
+    required String itemId,
+    this.workspaceId = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : kind = Value(kind),
+       itemId = Value(itemId);
+  static Insertable<SyncScopeRow> custom({
+    Expression<String>? kind,
+    Expression<String>? itemId,
+    Expression<String>? workspaceId,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (kind != null) 'kind': kind,
+      if (itemId != null) 'item_id': itemId,
+      if (workspaceId != null) 'workspace_id': workspaceId,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  SyncScopesCompanion copyWith({
+    Value<String>? kind,
+    Value<String>? itemId,
+    Value<String?>? workspaceId,
+    Value<int>? rowid,
+  }) {
+    return SyncScopesCompanion(
+      kind: kind ?? this.kind,
+      itemId: itemId ?? this.itemId,
+      workspaceId: workspaceId ?? this.workspaceId,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (kind.present) {
+      map['kind'] = Variable<String>(kind.value);
+    }
+    if (itemId.present) {
+      map['item_id'] = Variable<String>(itemId.value);
+    }
+    if (workspaceId.present) {
+      map['workspace_id'] = Variable<String>(workspaceId.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SyncScopesCompanion(')
+          ..write('kind: $kind, ')
+          ..write('itemId: $itemId, ')
+          ..write('workspaceId: $workspaceId, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -4977,6 +5248,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $SyncStatesTable syncStates = $SyncStatesTable(this);
   late final $SyncOutboxTable syncOutbox = $SyncOutboxTable(this);
   late final $SyncFlagsTable syncFlags = $SyncFlagsTable(this);
+  late final $SyncScopesTable syncScopes = $SyncScopesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -4993,6 +5265,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     syncStates,
     syncOutbox,
     syncFlags,
+    syncScopes,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -8595,6 +8868,179 @@ typedef $$SyncFlagsTableProcessedTableManager =
       SyncFlagRow,
       PrefetchHooks Function()
     >;
+typedef $$SyncScopesTableCreateCompanionBuilder =
+    SyncScopesCompanion Function({
+      required String kind,
+      required String itemId,
+      Value<String?> workspaceId,
+      Value<int> rowid,
+    });
+typedef $$SyncScopesTableUpdateCompanionBuilder =
+    SyncScopesCompanion Function({
+      Value<String> kind,
+      Value<String> itemId,
+      Value<String?> workspaceId,
+      Value<int> rowid,
+    });
+
+class $$SyncScopesTableFilterComposer
+    extends Composer<_$AppDatabase, $SyncScopesTable> {
+  $$SyncScopesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get itemId => $composableBuilder(
+    column: $table.itemId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get workspaceId => $composableBuilder(
+    column: $table.workspaceId,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$SyncScopesTableOrderingComposer
+    extends Composer<_$AppDatabase, $SyncScopesTable> {
+  $$SyncScopesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get itemId => $composableBuilder(
+    column: $table.itemId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get workspaceId => $composableBuilder(
+    column: $table.workspaceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$SyncScopesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $SyncScopesTable> {
+  $$SyncScopesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get kind =>
+      $composableBuilder(column: $table.kind, builder: (column) => column);
+
+  GeneratedColumn<String> get itemId =>
+      $composableBuilder(column: $table.itemId, builder: (column) => column);
+
+  GeneratedColumn<String> get workspaceId => $composableBuilder(
+    column: $table.workspaceId,
+    builder: (column) => column,
+  );
+}
+
+class $$SyncScopesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $SyncScopesTable,
+          SyncScopeRow,
+          $$SyncScopesTableFilterComposer,
+          $$SyncScopesTableOrderingComposer,
+          $$SyncScopesTableAnnotationComposer,
+          $$SyncScopesTableCreateCompanionBuilder,
+          $$SyncScopesTableUpdateCompanionBuilder,
+          (
+            SyncScopeRow,
+            BaseReferences<_$AppDatabase, $SyncScopesTable, SyncScopeRow>,
+          ),
+          SyncScopeRow,
+          PrefetchHooks Function()
+        > {
+  $$SyncScopesTableTableManager(_$AppDatabase db, $SyncScopesTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$SyncScopesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$SyncScopesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$SyncScopesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> kind = const Value.absent(),
+                Value<String> itemId = const Value.absent(),
+                Value<String?> workspaceId = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => SyncScopesCompanion(
+                kind: kind,
+                itemId: itemId,
+                workspaceId: workspaceId,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String kind,
+                required String itemId,
+                Value<String?> workspaceId = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => SyncScopesCompanion.insert(
+                kind: kind,
+                itemId: itemId,
+                workspaceId: workspaceId,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$SyncScopesTable, SyncScopeRow>(table),
+                  BaseReferences<_$AppDatabase, $SyncScopesTable, SyncScopeRow>(
+                    db,
+                    table,
+                    e,
+                  ),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$SyncScopesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $SyncScopesTable,
+      SyncScopeRow,
+      $$SyncScopesTableFilterComposer,
+      $$SyncScopesTableOrderingComposer,
+      $$SyncScopesTableAnnotationComposer,
+      $$SyncScopesTableCreateCompanionBuilder,
+      $$SyncScopesTableUpdateCompanionBuilder,
+      (
+        SyncScopeRow,
+        BaseReferences<_$AppDatabase, $SyncScopesTable, SyncScopeRow>,
+      ),
+      SyncScopeRow,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -8621,4 +9067,6 @@ class $AppDatabaseManager {
       $$SyncOutboxTableTableManager(_db, _db.syncOutbox);
   $$SyncFlagsTableTableManager get syncFlags =>
       $$SyncFlagsTableTableManager(_db, _db.syncFlags);
+  $$SyncScopesTableTableManager get syncScopes =>
+      $$SyncScopesTableTableManager(_db, _db.syncScopes);
 }

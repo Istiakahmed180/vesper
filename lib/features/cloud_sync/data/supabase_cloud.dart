@@ -172,40 +172,63 @@ class SupabaseCloudStore implements CloudStore {
     return user.id;
   }
 
+  static const sharedTable = 'shared_items';
+
   @override
   Future<void> upsert(List<CloudItem> items) async {
     final userId = _userId;
-    for (var i = 0; i < items.length; i += 200) {
-      final chunk = items.skip(i).take(200);
-      await _guard(
-        () => client.from(table).upsert([
-          for (final item in chunk)
-            {
-              'user_id': userId,
-              'kind': item.kind.name,
-              'id': item.id,
-              'data': item.data,
-              'deleted': item.deleted,
-              'client_updated_at': item.clientUpdatedAt
-                  .toUtc()
-                  .toIso8601String(),
-            },
-        ], onConflict: 'user_id,kind,id'),
-      );
+    final personal = items.where((i) => i.scope == null).toList();
+    final shared = items.where((i) => i.scope != null).toList();
+    for (final (rows, tableName, conflict) in [
+      (
+        [
+          for (final item in personal) {'user_id': userId, ..._row(item)},
+        ],
+        table,
+        'user_id,kind,id',
+      ),
+      (
+        [
+          for (final item in shared)
+            {'workspace_id': item.scope, ..._row(item)},
+        ],
+        sharedTable,
+        'workspace_id,kind,id',
+      ),
+    ]) {
+      for (var i = 0; i < rows.length; i += 200) {
+        final chunk = rows.skip(i).take(200).toList();
+        await _guard(
+          () => client.from(tableName).upsert(chunk, onConflict: conflict),
+        );
+      }
     }
   }
 
+  static Map<String, Object?> _row(CloudItem item) => {
+    'kind': item.kind.name,
+    'id': item.id,
+    'data': item.data,
+    'deleted': item.deleted,
+    'client_updated_at': item.clientUpdatedAt.toUtc().toIso8601String(),
+  };
+
   @override
-  Future<List<CloudItem>> changesSince(DateTime? cursor) async {
+  Future<List<CloudItem>> changesSince(
+    DateTime? cursor, {
+    String? scope,
+  }) async {
     final userId = _userId;
     final out = <CloudItem>[];
     for (var offset = 0; ; offset += _pageSize) {
       var query = client
-          .from(table)
+          .from(scope == null ? table : sharedTable)
           .select(
             'kind, id, data, deleted, client_updated_at, server_updated_at',
-          )
-          .eq('user_id', userId);
+          );
+      query = scope == null
+          ? query.eq('user_id', userId)
+          : query.eq('workspace_id', scope);
       if (cursor != null) {
         query = query.gt('server_updated_at', cursor.toUtc().toIso8601String());
       }
@@ -227,12 +250,110 @@ class SupabaseCloudStore implements CloudStore {
                 : data.cast<String, Object?>(),
             clientUpdatedAt: DateTime.parse('${row['client_updated_at']}'),
             serverUpdatedAt: DateTime.parse('${row['server_updated_at']}'),
+            scope: scope,
           ),
         );
       }
       if (rows.length < _pageSize) return out;
     }
   }
+
+  @override
+  Future<Map<String, WorkspaceRole>> memberships() async {
+    final userId = _userId;
+    try {
+      await _guard(() => client.rpc<Object?>('accept_workspace_invites'));
+    } on SyncFailure catch (e) {
+      // Older projects without team workspaces: personal sync still works.
+      if (e.message.contains('missing')) return {};
+      rethrow;
+    }
+    final rows = await _guard(
+      () => client
+          .from('workspace_members')
+          .select('workspace_id, role')
+          .eq('user_id', userId),
+    );
+    return {
+      for (final row in rows)
+        '${row['workspace_id']}': row['role'] == 'owner'
+            ? WorkspaceRole.owner
+            : WorkspaceRole.member,
+    };
+  }
+
+  // ------------------------------------------------------- team management
+
+  /// Creates the shared workspace (the caller becomes its owner).
+  Future<void> shareWorkspace(String id, String name) => _guard(
+    () => client.rpc<Object?>(
+      'share_workspace',
+      params: {'ws': id, 'ws_name': name},
+    ),
+  );
+
+  Future<List<WorkspaceMember>> members(String workspaceId) async {
+    final rows = await _guard(
+      () => client
+          .from('workspace_members')
+          .select('user_id, email, role')
+          .eq('workspace_id', workspaceId)
+          .order('added_at'),
+    );
+    return [
+      for (final row in rows)
+        WorkspaceMember(
+          userId: '${row['user_id']}',
+          email: '${row['email'] ?? ''}',
+          role: row['role'] == 'owner'
+              ? WorkspaceRole.owner
+              : WorkspaceRole.member,
+        ),
+    ];
+  }
+
+  Future<List<String>> invites(String workspaceId) async {
+    final rows = await _guard(
+      () => client
+          .from('workspace_invites')
+          .select('email')
+          .eq('workspace_id', workspaceId)
+          .order('created_at'),
+    );
+    return [for (final row in rows) '${row['email']}'];
+  }
+
+  Future<void> invite(String workspaceId, String email) => _guard(
+    () => client.from('workspace_invites').upsert({
+      'workspace_id': workspaceId,
+      'email': email.trim().toLowerCase(),
+      'invited_by': _userId,
+    }, onConflict: 'workspace_id,email'),
+  );
+
+  Future<void> cancelInvite(String workspaceId, String email) => _guard(
+    () => client
+        .from('workspace_invites')
+        .delete()
+        .eq('workspace_id', workspaceId)
+        .eq('email', email),
+  );
+
+  /// Removes [userId] (owner) or the caller (leaving).
+  Future<void> removeMember(String workspaceId, String userId) => _guard(
+    () => client
+        .from('workspace_members')
+        .delete()
+        .eq('workspace_id', workspaceId)
+        .eq('user_id', userId),
+  );
+
+  /// Deletes a shared workspace with everything in it (owner only).
+  Future<void> deleteSharedWorkspace(String workspaceId) => _guard(
+    () => client.from('team_workspaces').delete().eq('id', workspaceId),
+  );
+
+  String get currentUserId => _userId;
 
   /// Fires when another device changes this user's items.
   Stream<void> remoteChanges() {
@@ -245,6 +366,8 @@ class SupabaseCloudStore implements CloudStore {
         await controller.close();
       },
     );
+    // Shared items and memberships are limited to what the user may see by
+    // Row Level Security.
     channel = client
         .channel('vesper-sync-$userId')
         .onPostgresChanges(
@@ -258,6 +381,18 @@ class SupabaseCloudStore implements CloudStore {
           ),
           callback: (_) => controller.add(null),
         )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: sharedTable,
+          callback: (_) => controller.add(null),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'workspace_members',
+          callback: (_) => controller.add(null),
+        )
         .subscribe();
     return controller.stream;
   }
@@ -266,10 +401,10 @@ class SupabaseCloudStore implements CloudStore {
     try {
       return await call();
     } on PostgrestException catch (e) {
-      if (e.code == '42P01' || e.code == 'PGRST205') {
+      if (e.code == '42P01' || e.code == 'PGRST205' || e.code == 'PGRST202') {
         throw const SyncFailure(
-          'The sync table is missing. Run supabase/migrations/0001_vesper_sync.sql '
-          'in the Supabase SQL Editor.',
+          'A sync table or function is missing. Run the SQL files in '
+          'supabase/migrations in the Supabase SQL Editor.',
         );
       }
       throw SyncFailure('The sync server rejected the change: ${e.message}');

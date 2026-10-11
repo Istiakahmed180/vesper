@@ -14,7 +14,8 @@ values in their place, so a new computer needs tokens to be entered again.
 2. **Authentication → Sign In / Providers → Google:** enable it. Under
    **Client IDs** add the Google desktop client ID used for `GOOGLE_CLIENT_ID`,
    and enter that client's secret.
-3. **SQL Editor:** run `supabase/migrations/0001_vesper_sync.sql`. It creates
+3. **SQL Editor:** run `supabase/migrations/0001_vesper_sync.sql`, then
+   `0002_team_workspaces.sql` (team workspaces). It creates
    the `sync_items` table, Row Level Security policies (each user only sees
    their own rows), the last-write-wins trigger and the realtime publication.
 4. **Project Settings → API Keys:** put the project URL and the anon /
@@ -71,6 +72,28 @@ other device ◄─ realtime ping ◄─ Supabase ◄────────┘
   add it to the account, or sign out.
 - "Clear local database" does not delete cloud data; the next sync downloads
   it again.
+
+## Team workspaces
+
+A workspace other than My Workspace can be shared from the workspace menu
+(**Share workspace…**). The owner invites teammates by email; a teammate
+joins by signing in to Vesper with that email (Google or GitHub), which
+accepts the invite (`accept_workspace_invites`).
+
+- Shared content (the workspace, its collections, folders, requests and
+  environments) lives in `shared_items`, readable and writable by members
+  only (Row Level Security via `is_workspace_member`). History and secrets
+  are never shared; each member enters their own tokens.
+- Roles: the **owner** invites and removes members and can delete the
+  workspace for everyone; **members** edit content and can leave.
+- Locally, `sync_scopes` remembers whether each item was last stored in the
+  personal space or a shared workspace, so deletions are addressed correctly
+  and items that move (sharing a workspace, moving a collection into it) are
+  removed from their old space. A deletion from the old space is not applied
+  on the owner's other devices while the item lives in the shared space.
+- Every sync first refreshes memberships; a workspace the user left or was
+  removed from disappears from their computer.
+- Each space has its own pull cursor (`cloud.cursor`, `cloud.cursor.<id>`).
 
 Code: `lib/features/cloud_sync/` (engine and models in `domain`, Drift and
 Supabase in `data`, controller and widgets in `presentation`). Tests:

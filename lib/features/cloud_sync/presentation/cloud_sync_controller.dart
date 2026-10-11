@@ -15,6 +15,7 @@ import '../../workspace/presentation/workspace_controller.dart';
 import '../../workspaces/presentation/workspace_providers.dart';
 import '../data/drift_local_sync_store.dart';
 import '../data/supabase_cloud.dart';
+import '../domain/cloud_models.dart';
 import '../domain/sync_engine.dart';
 import 'cloud_providers.dart';
 
@@ -43,11 +44,15 @@ class CloudSyncState {
     this.lastSyncedAt,
     this.message,
     this.previousAccount,
+    this.sharedWorkspaces = const {},
   });
 
   final CloudSyncPhase phase;
   final DateTime? lastSyncedAt;
   final String? message;
+
+  /// Shared workspaces the user belongs to, with their role.
+  final Map<String, WorkspaceRole> sharedWorkspaces;
 
   /// Email of the account whose data is on this computer
   /// ([CloudSyncPhase.accountChanged]).
@@ -59,13 +64,18 @@ class CloudSyncState {
       phase == CloudSyncPhase.offline ||
       phase == CloudSyncPhase.error;
 
-  CloudSyncState copyWith(CloudSyncPhase phase, {String? message}) =>
-      CloudSyncState(
-        phase,
-        lastSyncedAt: lastSyncedAt,
-        message: message,
-        previousAccount: previousAccount,
-      );
+  CloudSyncState copyWith(
+    CloudSyncPhase phase, {
+    String? message,
+    DateTime? lastSyncedAt,
+    Map<String, WorkspaceRole>? sharedWorkspaces,
+  }) => CloudSyncState(
+    phase,
+    lastSyncedAt: lastSyncedAt ?? this.lastSyncedAt,
+    message: message,
+    previousAccount: previousAccount,
+    sharedWorkspaces: sharedWorkspaces ?? this.sharedWorkspaces,
+  );
 }
 
 final cloudSyncProvider = NotifierProvider<CloudSyncController, CloudSyncState>(
@@ -234,6 +244,13 @@ class CloudSyncController extends Notifier<CloudSyncState> {
     _stopListening();
     // Leaves "connecting" so [syncNow] runs.
     state = state.copyWith(CloudSyncPhase.syncing);
+    unawaited(
+      _local!.readMemberships().then((m) {
+        if (_connectedAs != null) {
+          state = state.copyWith(state.phase, sharedWorkspaces: m);
+        }
+      }),
+    );
     final db = ref.read(databaseProvider);
     _subscriptions
       ..add(
@@ -273,9 +290,10 @@ class CloudSyncController extends Notifier<CloudSyncState> {
         try {
           await engine.sync();
           if (generation != _generation) return;
-          state = CloudSyncState(
+          state = state.copyWith(
             CloudSyncPhase.synced,
             lastSyncedAt: DateTime.now(),
+            sharedWorkspaces: await _local!.readMemberships(),
           );
         } catch (e) {
           if (generation != _generation) return;
@@ -313,6 +331,67 @@ class CloudSyncController extends Notifier<CloudSyncState> {
   /// Signing out removes the account's data from this computer; it stays in
   /// the cloud and comes back at the next sign-in. Vault secrets are kept:
   /// they are keyed by item id and reattach when the items return.
+  // ------------------------------------------------------- team workspaces
+
+  SupabaseCloudStore _requireStore() {
+    final store = _store;
+    if (store == null || !state.isActive) {
+      throw const SyncFailure('Sign in to share workspaces with your team.');
+    }
+    return store;
+  }
+
+  /// Shares [workspaceId] (the caller becomes its owner) and moves its
+  /// content into the shared space.
+  Future<void> shareWorkspace(String workspaceId, String name) async {
+    if (workspaceId == defaultWorkspaceId) {
+      throw const ValidationFailure(
+        'My Workspace is personal. Create a workspace for your team and move '
+        'collections into it.',
+      );
+    }
+    await _requireStore().shareWorkspace(workspaceId, name);
+    await _engine!.refreshMemberships();
+    await _local!.enqueueWorkspace(workspaceId);
+    await syncNow();
+  }
+
+  Future<List<WorkspaceMember>> members(String workspaceId) =>
+      _requireStore().members(workspaceId);
+
+  Future<List<String>> invites(String workspaceId) =>
+      _requireStore().invites(workspaceId);
+
+  Future<void> invite(String workspaceId, String email) {
+    final address = email.trim().toLowerCase();
+    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(address)) {
+      throw const ValidationFailure('Enter a valid email address.');
+    }
+    return _requireStore().invite(workspaceId, address);
+  }
+
+  Future<void> cancelInvite(String workspaceId, String email) =>
+      _requireStore().cancelInvite(workspaceId, email);
+
+  Future<void> removeMember(String workspaceId, String userId) =>
+      _requireStore().removeMember(workspaceId, userId);
+
+  /// Leaves a workspace someone else shared; it disappears from this
+  /// computer.
+  Future<void> leaveWorkspace(String workspaceId) async {
+    final store = _requireStore();
+    await store.removeMember(workspaceId, store.currentUserId);
+    await _local!.removeWorkspace(workspaceId);
+    await syncNow();
+  }
+
+  /// Deletes a shared workspace for every member (owner only).
+  Future<void> deleteSharedWorkspace(String workspaceId) async {
+    await _requireStore().deleteSharedWorkspace(workspaceId);
+    await _local!.removeWorkspace(workspaceId);
+    await syncNow();
+  }
+
   Future<void> _disconnect() async {
     final wasSyncing = state.isActive;
     _generation++;

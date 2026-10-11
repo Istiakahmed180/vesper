@@ -40,30 +40,225 @@ class DriftLocalSyncStore implements LocalSyncStore {
   }
 
   @override
-  Future<void> acknowledge(List<OutboxEntry> entries) =>
-      _db.transaction(() async {
-        for (final e in entries) {
-          await (_db.delete(_db.syncOutbox)..where(
-                (o) =>
-                    o.kind.equals(e.kind.name) &
-                    o.itemId.equals(e.id) &
-                    o.changedAt.equals(e.changedAt),
-              ))
-              .go();
-        }
-      });
+  Future<void> acknowledge(
+    List<OutboxEntry> entries,
+    List<CloudItem> uploaded,
+  ) => _db.transaction(() async {
+    for (final item in uploaded) {
+      await _recordScope(item);
+    }
+    for (final e in entries) {
+      await (_db.delete(_db.syncOutbox)..where(
+            (o) =>
+                o.kind.equals(e.kind.name) &
+                o.itemId.equals(e.id) &
+                o.changedAt.equals(e.changedAt),
+          ))
+          .go();
+    }
+  });
 
   Future<void> _deleteOutbox(String kind, String id) => (_db.delete(
     _db.syncOutbox,
   )..where((o) => o.kind.equals(kind) & o.itemId.equals(id))).go();
 
   @override
-  Future<CloudItem> snapshot(OutboxEntry entry) async => CloudItem(
-    kind: entry.kind,
-    id: entry.id,
-    data: await _serialize(entry.kind, entry.id),
-    clientUpdatedAt: entry.time,
-  );
+  Future<List<CloudItem>> snapshot(OutboxEntry entry) async {
+    final shared = await readMemberships();
+    final data = await _serialize(entry.kind, entry.id);
+    final previous = await _scopeRecord(entry.kind, entry.id);
+    String? scope;
+    if (data != null) {
+      final workspace = await _workspaceOf(entry.kind, entry.id);
+      scope = workspace != null && shared.containsKey(workspace)
+          ? workspace
+          : null;
+    } else {
+      scope = previous?.workspaceId;
+    }
+    // A shared workspace the user no longer belongs to cannot be written.
+    if (scope != null && !shared.containsKey(scope)) return const [];
+    CloudItem item(JsonMap? data, String? scope) => CloudItem(
+      kind: entry.kind,
+      id: entry.id,
+      data: data,
+      clientUpdatedAt: entry.time,
+      scope: scope,
+    );
+    return [
+      // Moved between spaces: remove it from the old one.
+      if (data != null &&
+          previous != null &&
+          previous.workspaceId != scope &&
+          (previous.workspaceId == null ||
+              shared.containsKey(previous.workspaceId)))
+        item(null, previous.workspaceId),
+      item(data, scope),
+    ];
+  }
+
+  Future<SyncScopeRow?> _scopeRecord(CloudKind kind, String id) =>
+      (_db.select(_db.syncScopes)
+            ..where((s) => s.kind.equals(kind.name) & s.itemId.equals(id)))
+          .getSingleOrNull();
+
+  Future<void> _recordScope(CloudItem item) async {
+    if (item.deleted) {
+      final current = await _scopeRecord(item.kind, item.id);
+      // Only forget the record of the space the item was removed from.
+      if (current != null && current.workspaceId == item.scope) {
+        await (_db.delete(_db.syncScopes)..where(
+              (s) => s.kind.equals(item.kind.name) & s.itemId.equals(item.id),
+            ))
+            .go();
+      }
+      return;
+    }
+    await _db
+        .into(_db.syncScopes)
+        .insertOnConflictUpdate(
+          SyncScopesCompanion.insert(
+            kind: item.kind.name,
+            itemId: item.id,
+            workspaceId: Value(item.scope),
+          ),
+        );
+  }
+
+  /// The workspace an existing item belongs to (null for history, which is
+  /// always personal).
+  Future<String?> _workspaceOf(CloudKind kind, String id) async {
+    final sql = switch (kind) {
+      CloudKind.workspace => 'SELECT id AS ws FROM workspaces WHERE id = ?',
+      CloudKind.collection =>
+        'SELECT workspace_id AS ws FROM collections WHERE id = ?',
+      CloudKind.environment =>
+        'SELECT workspace_id AS ws FROM environments WHERE id = ?',
+      CloudKind.folder =>
+        'SELECT c.workspace_id AS ws FROM folders f '
+            'JOIN collections c ON c.id = f.collection_id WHERE f.id = ?',
+      CloudKind.request =>
+        'SELECT c.workspace_id AS ws FROM requests r '
+            'JOIN collections c ON c.id = r.collection_id WHERE r.id = ?',
+      CloudKind.history => null,
+    };
+    if (sql == null) return null;
+    final row = await _db
+        .customSelect(sql, variables: [Variable.withString(id)])
+        .getSingleOrNull();
+    return row?.read<String>('ws');
+  }
+
+  /// Queues everything in [workspaceId] for upload (it was just shared).
+  Future<void> enqueueWorkspace(String workspaceId) async {
+    final now = _iso(DateTime.now());
+    final ws = Variable.withString(workspaceId);
+    for (final (kind, sql) in [
+      ('workspace', 'SELECT id FROM workspaces WHERE id = ?'),
+      ('collection', 'SELECT id FROM collections WHERE workspace_id = ?'),
+      (
+        'folder',
+        'SELECT f.id FROM folders f JOIN collections c ON c.id = f.collection_id '
+            'WHERE c.workspace_id = ?',
+      ),
+      (
+        'request',
+        'SELECT r.id FROM requests r JOIN collections c ON c.id = r.collection_id '
+            'WHERE c.workspace_id = ?',
+      ),
+      ('environment', 'SELECT id FROM environments WHERE workspace_id = ?'),
+    ]) {
+      for (final row in await _db.customSelect(sql, variables: [ws]).get()) {
+        await _db
+            .into(_db.syncOutbox)
+            .insertOnConflictUpdate(
+              SyncOutboxCompanion.insert(
+                kind: kind,
+                itemId: row.read<String>('id'),
+                changedAt: now,
+              ),
+            );
+      }
+    }
+  }
+
+  // ------------------------------------------------------------ memberships
+
+  static const membershipsKey = 'cloud.shared_workspaces';
+
+  @override
+  Future<Map<String, WorkspaceRole>> readMemberships() async {
+    final row = await (_db.select(
+      _db.settingsEntries,
+    )..where((s) => s.key.equals(membershipsKey))).getSingleOrNull();
+    if (row == null) return {};
+    try {
+      final json = jsonDecode(row.value);
+      if (json is! Map) return {};
+      return {
+        for (final MapEntry(:key, :value) in json.entries)
+          if (key is String)
+            key: value == 'owner' ? WorkspaceRole.owner : WorkspaceRole.member,
+      };
+    } on FormatException {
+      return {};
+    }
+  }
+
+  @override
+  Future<void> writeMemberships(Map<String, WorkspaceRole> memberships) async {
+    final previous = await readMemberships();
+    for (final gone in previous.keys.where(
+      (k) => !memberships.containsKey(k),
+    )) {
+      await removeWorkspace(gone);
+    }
+    await _db
+        .into(_db.settingsEntries)
+        .insertOnConflictUpdate(
+          SettingsEntriesCompanion.insert(
+            key: membershipsKey,
+            value: jsonEncode({
+              for (final MapEntry(:key, :value) in memberships.entries)
+                key: value.name,
+            }),
+          ),
+        );
+  }
+
+  /// Removes a shared workspace and its content from this computer only
+  /// (left, removed by the owner, or deleted).
+  Future<void> removeWorkspace(String workspaceId) async {
+    if (workspaceId == defaultWorkspaceId) return;
+    await _db.withoutChangeTracking(() async {
+      final ws = [Variable.withString(workspaceId)];
+      for (final sql in [
+        'DELETE FROM collections WHERE workspace_id = ?',
+        'DELETE FROM environments WHERE workspace_id = ?',
+        'DELETE FROM history_entries WHERE workspace_id = ?',
+        'DELETE FROM workspaces WHERE id = ?',
+      ]) {
+        await _db.customUpdate(
+          sql,
+          variables: ws,
+          updates: {
+            _db.collections,
+            _db.folders,
+            _db.requests,
+            _db.environments,
+            _db.envVariables,
+            _db.historyEntries,
+            _db.workspaces,
+          },
+          updateKind: UpdateKind.delete,
+        );
+      }
+      await (_db.delete(
+        _db.settingsEntries,
+      )..where((s) => s.key.equals(_cursorKey(workspaceId)))).go();
+    });
+    await _removeOrphanedSecrets();
+  }
 
   @override
   Future<void> enqueueAll() async {
@@ -110,19 +305,25 @@ class DriftLocalSyncStore implements LocalSyncStore {
     });
   }
 
+  static String _cursorKey(String? scope) =>
+      scope == null ? cursorKey : '$cursorKey.$scope';
+
   @override
-  Future<DateTime?> readCursor() async {
+  Future<DateTime?> readCursor({String? scope}) async {
     final row = await (_db.select(
       _db.settingsEntries,
-    )..where((s) => s.key.equals(cursorKey))).getSingleOrNull();
+    )..where((s) => s.key.equals(_cursorKey(scope)))).getSingleOrNull();
     return row == null ? null : DateTime.tryParse(row.value);
   }
 
   @override
-  Future<void> writeCursor(DateTime cursor) => _db
+  Future<void> writeCursor(DateTime cursor, {String? scope}) => _db
       .into(_db.settingsEntries)
       .insertOnConflictUpdate(
-        SettingsEntriesCompanion.insert(key: cursorKey, value: _iso(cursor)),
+        SettingsEntriesCompanion.insert(
+          key: _cursorKey(scope),
+          value: _iso(cursor),
+        ),
       );
 
   /// Whether this computer holds anything worth keeping: collections,
@@ -140,12 +341,18 @@ class DriftLocalSyncStore implements LocalSyncStore {
     return rows.read<int>('n') > 0;
   }
 
-  /// Forgets the cursor and pending changes (sign-out of another account).
+  /// Forgets cursors, memberships and pending changes (sign-out, account
+  /// change).
   Future<void> reset() async {
     await _db.delete(_db.syncOutbox).go();
-    await (_db.delete(
-      _db.settingsEntries,
-    )..where((s) => s.key.equals(cursorKey))).go();
+    await _db.delete(_db.syncScopes).go();
+    await (_db.delete(_db.settingsEntries)..where(
+          (s) =>
+              s.key.equals(cursorKey) |
+              s.key.like('$cursorKey.%') |
+              s.key.equals(membershipsKey),
+        ))
+        .go();
   }
 
   // ------------------------------------------------------------ serializing
@@ -294,6 +501,7 @@ class DriftLocalSyncStore implements LocalSyncStore {
           item,
     ];
     if (accepted.isEmpty) return;
+    final shared = await readMemberships();
 
     final batchIds = {
       for (final kind in CloudKind.values)
@@ -313,10 +521,19 @@ class DriftLocalSyncStore implements LocalSyncStore {
       }
       for (final kind in CloudKind.values.reversed) {
         for (final item in accepted.where((i) => i.kind == kind)) {
-          if (item.deleted) removedAny |= await _remove(item);
+          if (!item.deleted) continue;
+          // A deletion from the space the item moved out of (e.g. into a
+          // shared workspace) must not remove it here.
+          final workspace = await _workspaceOf(item.kind, item.id);
+          final scope = workspace != null && shared.containsKey(workspace)
+              ? workspace
+              : null;
+          if (workspace != null && scope != item.scope) continue;
+          removedAny |= await _remove(item);
         }
       }
       for (final item in accepted) {
+        await _recordScope(item);
         await (_db.delete(_db.syncOutbox)..where(
               (o) =>
                   o.kind.equals(item.kind.name) &

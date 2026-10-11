@@ -236,13 +236,24 @@ class DriftCollectionRepository implements CollectionRepository {
               ..addColumns([max])
               ..where(_db.collections.workspaceId.equals(workspaceId)))
             .getSingle();
-    await (_db.update(_db.collections)..where((c) => c.id.equals(id))).write(
-      CollectionsCompanion(
-        workspaceId: Value(workspaceId),
-        sortOrder: Value((top.read(max) ?? -1) + 1),
-        updatedAt: Value(DateTime.now()),
-      ),
-    );
+    await _db.transaction(() async {
+      await (_db.update(_db.collections)..where((c) => c.id.equals(id))).write(
+        CollectionsCompanion(
+          workspaceId: Value(workspaceId),
+          sortOrder: Value((top.read(max) ?? -1) + 1),
+          updatedAt: Value(DateTime.now()),
+        ),
+      );
+      // Touch the contents so change tracking files them under the new
+      // workspace too (cloud sync keeps shared workspaces separately).
+      for (final table in ['folders', 'requests']) {
+        await _db.customUpdate(
+          'UPDATE $table SET updated_at = updated_at WHERE collection_id = ?',
+          variables: [Variable.withString(id)],
+          updates: {_db.folders, _db.requests},
+        );
+      }
+    });
   }
 
   // ---------------------------------------------------- collection settings
