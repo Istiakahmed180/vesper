@@ -4,7 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/storage/app_database.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/dialogs.dart';
+import '../../cloud_sync/domain/cloud_models.dart';
+import '../../cloud_sync/presentation/cloud_sync_controller.dart';
 import '../domain/workspace.dart';
+import 'share_workspace_dialog.dart';
 import 'workspace_providers.dart';
 
 Future<void> newWorkspaceCommand(BuildContext context, WidgetRef ref) async {
@@ -44,19 +47,37 @@ Future<void> deleteWorkspaceCommand(
   WidgetRef ref,
   Workspace workspace,
 ) async {
+  final role = ref.read(cloudSyncProvider).sharedWorkspaces[workspace.id];
+  if (role == WorkspaceRole.member) {
+    // Not ours to delete: leaving removes it from this computer.
+    return showShareWorkspaceDialog(context, workspace);
+  }
   final ok = await confirmDialog(
     context,
     title: 'Delete workspace',
-    message:
-        'Delete "${workspace.name}" with all of its collections, environments, '
-        'history and stored secrets? This cannot be undone. Export anything '
-        'you want to keep first.',
+    message: role == WorkspaceRole.owner
+        ? 'Delete "${workspace.name}" for everyone? All of its collections '
+              'and environments are removed for every member. This cannot be '
+              'undone. Export anything you want to keep first.'
+        : 'Delete "${workspace.name}" with all of its collections, '
+              'environments, history and stored secrets? This cannot be '
+              'undone. Export anything you want to keep first.',
     confirmLabel: 'Delete workspace',
   );
   if (!ok || !context.mounted) return;
+  if (role == WorkspaceRole.owner) {
+    await ref
+        .read(activeWorkspaceIdProvider.notifier)
+        .select(defaultWorkspaceId);
+  }
+  if (!context.mounted) return;
   await guarded(
     context,
-    () => ref.read(activeWorkspaceIdProvider.notifier).delete(workspace.id),
+    () => role == WorkspaceRole.owner
+        ? ref
+              .read(cloudSyncProvider.notifier)
+              .deleteSharedWorkspace(workspace.id)
+        : ref.read(activeWorkspaceIdProvider.notifier).delete(workspace.id),
     success: 'Workspace "${workspace.name}" deleted',
   );
 }
@@ -81,6 +102,10 @@ class _WorkspaceSwitcherState extends ConsumerState<WorkspaceSwitcher> {
     final activeId = ref.watch(activeWorkspaceIdProvider);
     final active = ref.watch(activeWorkspaceProvider);
     final name = active?.name ?? defaultWorkspaceName;
+    final shared = ref.watch(
+      cloudSyncProvider.select((s) => s.sharedWorkspaces),
+    );
+    final activeRole = active == null ? null : shared[active.id];
 
     return MenuAnchor(
       controller: _menu,
@@ -105,9 +130,24 @@ class _WorkspaceSwitcherState extends ConsumerState<WorkspaceSwitcher> {
           MenuItemButton(
             key: ValueKey('workspace-item-${w.id}'),
             leadingIcon: WorkspaceAvatar(name: w.name, size: 20),
-            trailingIcon: w.id == activeId
-                ? Icon(Icons.check, size: 16, color: colors.accent)
-                : null,
+            trailingIcon: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (shared.containsKey(w.id))
+                  Tooltip(
+                    message: 'Shared with your team',
+                    child: Icon(
+                      Icons.group_outlined,
+                      size: 15,
+                      color: colors.textMuted,
+                    ),
+                  ),
+                if (w.id == activeId) ...[
+                  const SizedBox(width: 6),
+                  Icon(Icons.check, size: 16, color: colors.accent),
+                ],
+              ],
+            ),
             onPressed: () =>
                 ref.read(activeWorkspaceIdProvider.notifier).select(w.id),
             child: ConstrainedBox(
@@ -121,6 +161,19 @@ class _WorkspaceSwitcherState extends ConsumerState<WorkspaceSwitcher> {
           onPressed: () => newWorkspaceCommand(context, ref),
           child: const Text('New workspace…'),
         ),
+        if (active != null && active.id != defaultWorkspaceId)
+          MenuItemButton(
+            key: const ValueKey('share-workspace-menu'),
+            leadingIcon: const Icon(Icons.group_add_outlined, size: 18),
+            onPressed: () => showShareWorkspaceDialog(context, active),
+            child: Text(
+              activeRole == null
+                  ? 'Share workspace…'
+                  : activeRole == WorkspaceRole.owner
+                  ? 'Manage members…'
+                  : 'Members…',
+            ),
+          ),
         if (active != null) ...[
           MenuItemButton(
             leadingIcon: const Icon(Icons.edit_outlined, size: 18),
@@ -136,7 +189,9 @@ class _WorkspaceSwitcherState extends ConsumerState<WorkspaceSwitcher> {
               ),
               onPressed: () => deleteWorkspaceCommand(context, ref, active),
               child: Text(
-                'Delete workspace…',
+                activeRole == WorkspaceRole.member
+                    ? 'Leave workspace…'
+                    : 'Delete workspace…',
                 style: TextStyle(color: colors.danger),
               ),
             ),

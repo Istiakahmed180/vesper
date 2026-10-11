@@ -6,7 +6,7 @@ Vesper stores local data in SQLite through [Drift](https://drift.simonbinder.eu/
 
 Schema: `lib/core/storage/app_database.dart`. Generated code: `app_database.g.dart`, regenerated with `dart run build_runner build`. Dates are stored as ISO-8601 text, and foreign keys are enforced (`PRAGMA foreign_keys = ON`).
 
-## Tables (schema v4)
+## Tables (schema v5)
 
 | Table | Purpose | Notes |
 | --- | --- | --- |
@@ -21,6 +21,7 @@ Schema: `lib/core/storage/app_database.dart`. Generated code: `app_database.g.da
 | `sync_states` | Last synced state per item and remote (GitHub sync) | Primary key `(item_key, remote)` |
 | `sync_outbox` | Local changes waiting for cloud sync, filled by triggers | Primary key `(kind, item_id)` |
 | `sync_flags` | Silences the change triggers while a row exists | Used when applying cloud changes and wiping |
+| `sync_scopes` | Cloud space of each synced item (personal or a shared workspace) | Primary key `(kind, item_id)` |
 
 Indexes: `requests(collection_id)`, `folders(collection_id)`, `history_entries(executed_at)`, `env_variables(environment_id)`, and `workspace_id` on `collections`, `environments` and `history_entries`.
 
@@ -62,6 +63,8 @@ Steps run in order, so a user upgrading from v1 to v4 runs every step.
 **v2 → v3 (collection settings):** adds `auth_json` (`'{}'`) and `variables_json` (`'[]'`) to `collections`.
 
 **v3 → v4 (cloud sync):** creates `sync_outbox`, `sync_flags` and the change triggers (see cloud-sync.md), and renames Globals environments to `globals-<workspaceId>`. Their secret values move in the vault at the next start (`migrateEnvironmentVaultKeys`).
+
+**v4 → v5 (team workspaces):** creates `sync_scopes`.
 
 ## Streams
 

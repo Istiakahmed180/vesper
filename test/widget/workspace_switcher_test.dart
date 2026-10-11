@@ -63,9 +63,23 @@ void main() {
       findsNothing,
       reason: 'the default workspace cannot be deleted',
     );
+    expect(find.text('Share workspace…'), findsNothing);
     await tester.tap(find.text('Client A'));
     await settle();
     expect(container.read(activeWorkspaceProvider)?.name, 'Client A');
+
+    // Only workspaces other than My Workspace can be shared, and sharing
+    // needs a signed-in account.
+    await tester.tap(find.byKey(const ValueKey('workspace-switcher')));
+    await settle();
+    await tester.tap(find.text('Share workspace…'));
+    await settle();
+    expect(
+      find.textContaining('Sign in with Google or GitHub'),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Done'));
+    await settle();
 
     await tester.tap(find.byKey(const ValueKey('workspace-switcher')));
     await settle();
