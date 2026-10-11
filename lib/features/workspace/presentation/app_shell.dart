@@ -11,6 +11,7 @@ import '../../../core/di/app_providers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/dialogs.dart';
 import '../../api_client/presentation/request/request_editor.dart';
+import '../../collections/presentation/collection_editor.dart';
 import '../../environments/presentation/environment_editor.dart';
 import '../../environments/presentation/environment_providers.dart';
 import '../../github/presentation/github_providers.dart';
@@ -314,6 +315,7 @@ class _MainArea extends ConsumerWidget {
         return switch (t) {
           RequestTab() => ('request', t.id),
           EnvironmentTab() => ('env:${t.environmentId}', t.id),
+          CollectionTab() => ('collection:${t.collectionId}', t.id),
           null => ('none', ''),
         };
       }),
@@ -327,6 +329,10 @@ class _MainArea extends ConsumerWidget {
           child: switch (kind) {
             'request' => RequestWorkspace(key: ValueKey(tabId), tabId: tabId),
             'none' => const SizedBox.shrink(),
+            _ when kind.startsWith('collection:') => CollectionEditor(
+              key: ValueKey(tabId),
+              tabId: tabId,
+            ),
             _ => EnvironmentEditor(
               key: ValueKey(tabId),
               environmentId: kind.substring(4),

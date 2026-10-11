@@ -6,6 +6,7 @@ import '../../../core/errors/app_failure.dart';
 import '../../../core/network/cancel_handle.dart';
 import '../../api_client/domain/models/api_response.dart';
 import '../../api_client/domain/usecases/send_request.dart';
+import '../../collections/presentation/collection_providers.dart';
 import '../../environments/presentation/environment_providers.dart';
 import '../../settings/presentation/settings_controller.dart';
 import '../domain/workspace_models.dart';
@@ -68,9 +69,15 @@ class ResponseController extends Notifier<ResponseState> {
     final generation = ++_generation;
     state = ResponseLoading(DateTime.now(), handle);
     try {
+      final context = await loadRequestContext(
+        (id) => ref.read(collectionRepositoryProvider).getSettings(id),
+        ref.read(variableResolverProvider),
+        tab.draft.collectionId,
+      );
       final response = await ref.read(sendRequestUseCaseProvider)(
         tab.draft,
-        resolver: ref.read(variableResolverProvider),
+        resolver: context.resolver,
+        inheritedAuth: context.inheritedAuth,
         settings: ref.read(settingsProvider),
         savedRequestId: tab.savedRequestId,
         cancel: handle,

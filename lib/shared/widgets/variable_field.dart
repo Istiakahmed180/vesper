@@ -3,8 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
-import '../../features/environments/presentation/environment_providers.dart';
 import 'variable_autocomplete.dart';
+import 'variable_scope.dart';
 import 'variable_text_controller.dart';
 
 /// Single or multi-line text field with `{{variable}}` highlighting. It owns
@@ -89,7 +89,7 @@ class _VariableFieldState extends ConsumerState<VariableField> {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final resolver = ref.watch(variableResolverProvider);
+    final resolver = VariableScope.watch(ref, context);
     _controller
       ..resolvedColor = colors.variable
       ..unresolvedColor = colors.variableUnresolved

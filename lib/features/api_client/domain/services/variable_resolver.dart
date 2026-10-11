@@ -11,7 +11,7 @@ class ResolvedText {
 }
 
 /// Where a variable value came from; used for previews and tooltips.
-enum VariableSource { environment, global, dynamic }
+enum VariableSource { environment, collection, global, dynamic }
 
 class VariableValue {
   const VariableValue(this.value, this.source, {this.isSecret = false});
@@ -22,11 +22,12 @@ class VariableValue {
 }
 
 /// Resolves `{{name}}` placeholders. Scopes are searched in priority order
-/// (environment before globals). Values may reference other variables; nesting
+/// (environment, then the request's collection, then globals). Values may reference other variables; nesting
 /// is resolved up to [maxDepth] to avoid infinite loops on cycles.
 class VariableResolver {
   VariableResolver({
     this.environment = const {},
+    this.collection = const {},
     this.globals = const {},
     Random? random,
     DateTime Function()? clock,
@@ -37,6 +38,7 @@ class VariableResolver {
   static const maxDepth = 6;
 
   final Map<String, VariableValue> environment;
+  final Map<String, VariableValue> collection;
   final Map<String, VariableValue> globals;
   final Random _random;
   final DateTime Function() _clock;
@@ -55,7 +57,7 @@ class VariableResolver {
           ? null
           : VariableValue(value, VariableSource.dynamic);
     }
-    return environment[name] ?? globals[name];
+    return environment[name] ?? collection[name] ?? globals[name];
   }
 
   String? _dynamic(String name) => switch (name) {
@@ -90,6 +92,16 @@ class VariableResolver {
   }
 
   String call(String input) => resolve(input).value;
+
+  /// This resolver with [scope] as the collection variables.
+  VariableResolver withCollection(Map<String, VariableValue> scope) =>
+      VariableResolver(
+        environment: environment,
+        collection: scope,
+        globals: globals,
+        random: _random,
+        clock: _clock,
+      );
 
   /// Names referenced in [input], in order of appearance.
   static List<String> referencedNames(String input) => [

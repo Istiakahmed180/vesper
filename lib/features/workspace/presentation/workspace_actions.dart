@@ -2,11 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/di/app_providers.dart';
 import '../../../core/errors/app_failure.dart';
 import '../../../shared/widgets/dialogs.dart';
+import '../../api_client/domain/models/prepared_request.dart';
 import '../../api_client/domain/services/curl_generator.dart';
 import '../../api_client/domain/services/curl_parser.dart';
 import '../../api_client/domain/services/request_preparer.dart';
+import '../../api_client/presentation/request/code_snippet_dialog.dart';
+import '../../collections/presentation/collection_providers.dart';
 import '../../environments/presentation/environment_providers.dart';
 import '../../settings/presentation/settings_controller.dart';
 import '../domain/workspace_models.dart';
@@ -80,20 +84,49 @@ class WorkspaceActions {
     if (id != null) _ws.duplicateTab(id);
   }
 
-  Future<void> copyAsCurl([String? tabId]) async {
+  /// The tab's request as it would be sent: variables from the environment
+  /// and its collection resolved, inherited authorization applied.
+  Future<PreparedRequest?> _prepare(
+    String? tabId, {
+    bool validate = true,
+  }) async {
     final id = tabId ?? _activeId;
     final tab = id == null ? null : ref.read(workspaceProvider).tab(id);
-    if (tab is! RequestTab) return;
+    if (tab is! RequestTab) return null;
+    final context = await loadRequestContext(
+      (id) => ref.read(collectionRepositoryProvider).getSettings(id),
+      ref.read(variableResolverProvider),
+      tab.draft.collectionId,
+    );
+    final settings = ref.read(settingsProvider).network;
+    return const RequestPreparer().prepare(
+      tab.draft,
+      context.resolver,
+      inheritedAuth: context.inheritedAuth,
+      validate: validate,
+      defaults: RequestDefaults(
+        timeoutMs: settings.timeoutMs,
+        followRedirects: settings.followRedirects,
+      ),
+    );
+  }
+
+  /// Opens the code snippet dialog for the tab's request.
+  Future<void> generateCode([String? tabId]) async {
     try {
-      final settings = ref.read(settingsProvider).network;
-      final prepared = const RequestPreparer().prepare(
-        tab.draft,
-        ref.read(variableResolverProvider),
-        defaults: RequestDefaults(
-          timeoutMs: settings.timeoutMs,
-          followRedirects: settings.followRedirects,
-        ),
-      );
+      final prepared = await _prepare(tabId, validate: false);
+      if (prepared != null && context.mounted) {
+        await showCodeSnippetDialog(context, prepared);
+      }
+    } on AppFailure catch (f) {
+      if (context.mounted) showToast(context, f.message, error: true);
+    }
+  }
+
+  Future<void> copyAsCurl([String? tabId]) async {
+    try {
+      final prepared = await _prepare(tabId);
+      if (prepared == null) return;
       await Clipboard.setData(
         ClipboardData(text: const CurlGenerator().generate(prepared)),
       );

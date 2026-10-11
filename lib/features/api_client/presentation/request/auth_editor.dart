@@ -9,10 +9,12 @@ import '../../../../core/utils/formatters.dart';
 import '../../../../shared/widgets/dialogs.dart';
 import '../../../../shared/widgets/secret_field.dart';
 import '../../../../shared/widgets/variable_field.dart';
-import '../../../environments/presentation/environment_providers.dart';
+import '../../../../shared/widgets/variable_scope.dart';
+import '../../../collections/presentation/collection_providers.dart';
 import '../../../workspace/presentation/workspace_controller.dart';
 import '../../domain/models/request_auth.dart';
 
+/// Authorization tab of a request.
 class AuthEditor extends ConsumerWidget {
   const AuthEditor({super.key, required this.tabId});
   final String tabId;
@@ -22,9 +24,42 @@ class AuthEditor extends ConsumerWidget {
     final auth =
         ref.watch(requestTabProvider(tabId).select((t) => t?.draft.auth)) ??
         const NoAuth();
-    void set(RequestAuth a) => ref
-        .read(workspaceProvider.notifier)
-        .updateDraft(tabId, (d) => d.copyWith(auth: a));
+    final collectionId = ref.watch(
+      requestTabProvider(tabId).select((t) => t?.draft.collectionId),
+    );
+    return AuthForm(
+      auth: auth,
+      allowInherit: true,
+      collectionId: collectionId,
+      onChanged: (a) => ref
+          .read(workspaceProvider.notifier)
+          .updateDraft(tabId, (d) => d.copyWith(auth: a)),
+    );
+  }
+}
+
+/// Edits a [RequestAuth]. Requests may choose "Inherit auth from parent"
+/// ([allowInherit]); [collectionId] is the collection they inherit from.
+class AuthForm extends ConsumerWidget {
+  const AuthForm({
+    super.key,
+    required this.auth,
+    required this.onChanged,
+    this.allowInherit = false,
+    this.collectionId,
+    this.noAuthHint = 'This request does not use any authorization.',
+  });
+
+  final RequestAuth auth;
+  final ValueChanged<RequestAuth> onChanged;
+  final bool allowInherit;
+  final String? collectionId;
+  final String noAuthHint;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final auth = this.auth;
+    void set(RequestAuth a) => onChanged(a);
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
@@ -34,14 +69,19 @@ class AuthEditor extends ConsumerWidget {
           child: Align(
             alignment: Alignment.centerLeft,
             child: SizedBox(
-              width: 260,
+              width: 300,
               child: DropdownButtonFormField<AuthType>(
                 key: ValueKey(auth.type),
                 initialValue: auth.type,
                 isDense: true,
+                isExpanded: true,
                 items: [
                   for (final t in AuthType.values)
-                    DropdownMenuItem(value: t, child: Text(t.label)),
+                    if (allowInherit || t != AuthType.inherit)
+                      DropdownMenuItem(
+                        value: t,
+                        child: Text(t.label, overflow: TextOverflow.ellipsis),
+                      ),
                 ],
                 onChanged: (t) {
                   if (t != null && t != auth.type) set(RequestAuth.empty(t));
@@ -52,9 +92,8 @@ class AuthEditor extends ConsumerWidget {
         ),
         const SizedBox(height: 8),
         switch (auth) {
-          NoAuth() => const _Hint(
-            'This request does not use any authorization.',
-          ),
+          InheritAuth() => _InheritedAuthInfo(collectionId: collectionId),
+          NoAuth() => _Hint(noAuthHint),
           final BearerAuth a => Column(
             children: [
               _Row(
@@ -139,6 +178,55 @@ class AuthEditor extends ConsumerWidget {
   }
 }
 
+/// Explains what an inheriting request sends, with a link to the collection.
+class _InheritedAuthInfo extends ConsumerWidget {
+  const _InheritedAuthInfo({required this.collectionId});
+  final String? collectionId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final id = collectionId;
+    if (id == null) {
+      return const _Hint(
+        'This request is not saved in a collection yet, so no authorization '
+        'is inherited. Save it to a collection to use the collection\'s auth.',
+      );
+    }
+    final name =
+        ref.watch(
+          collectionTreesProvider.select(
+            (t) => t.value
+                ?.where((c) => c.collection.id == id)
+                .firstOrNull
+                ?.collection
+                .name,
+          ),
+        ) ??
+        'collection';
+    final inherited = ref.watch(collectionSettingsProvider(id)).value?.auth;
+    final text = inherited == null || inherited is NoAuth
+        ? 'The "$name" collection has no authorization, so none is sent.'
+        : 'This request uses the ${inherited.type.label} authorization of the '
+              '"$name" collection.';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _Hint(text),
+        Padding(
+          padding: const EdgeInsets.only(left: 130),
+          child: TextButton.icon(
+            key: const ValueKey('edit-collection-auth'),
+            onPressed: () =>
+                ref.read(workspaceProvider.notifier).openCollection(id, name),
+            icon: const Icon(Icons.open_in_new, size: 15),
+            label: const Text('Edit collection authorization'),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _OAuth2Editor extends ConsumerStatefulWidget {
   const _OAuth2Editor({required this.auth, required this.onChanged});
   final OAuth2Auth auth;
@@ -154,7 +242,7 @@ class _OAuth2EditorState extends ConsumerState<_OAuth2Editor> {
   OAuth2Auth get a => widget.auth;
 
   Future<void> _getToken() async {
-    final resolver = ref.read(variableResolverProvider);
+    final resolver = VariableScope.read(ref, context);
     final client = ref.read(oauth2ClientProvider);
     final tokenUrl = Uri.tryParse(resolver(a.tokenUrl));
     if (tokenUrl == null || !tokenUrl.hasScheme) {
@@ -200,7 +288,7 @@ class _OAuth2EditorState extends ConsumerState<_OAuth2Editor> {
   }
 
   Future<void> _refresh() async {
-    final resolver = ref.read(variableResolverProvider);
+    final resolver = VariableScope.read(ref, context);
     setState(() => _busy = true);
     try {
       final token = await ref

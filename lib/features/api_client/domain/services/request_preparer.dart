@@ -22,7 +22,8 @@ class RequestDefaults {
 }
 
 /// Turns an editable [ApiRequest] into a [PreparedRequest]: resolves
-/// variables, applies authorization, builds the query string and body.
+/// variables, applies authorization ([inheritedAuth] is the collection's, used
+/// by requests set to inherit), builds the query string and body.
 /// Pure Dart; shared by the HTTP executor and the cURL generator.
 class RequestPreparer {
   const RequestPreparer();
@@ -32,6 +33,7 @@ class RequestPreparer {
     VariableResolver resolver, {
     RequestDefaults defaults = const RequestDefaults(),
     bool validate = true,
+    RequestAuth? inheritedAuth,
   }) {
     final unresolved = <String>{};
     String r(String input) {
@@ -71,7 +73,12 @@ class RequestPreparer {
         if (h.isActive) MapEntry(r(h.key).trim(), r(h.value)),
     ];
 
-    _applyAuth(request.auth, headers, query, r);
+    _applyAuth(
+      InheritAuth.effective(request.auth, inheritedAuth),
+      headers,
+      query,
+      r,
+    );
 
     final body = request.method.allowsBody || request.body.type != BodyType.none
         ? _prepareBody(request.body, r)
@@ -141,7 +148,7 @@ class RequestPreparer {
     }
 
     switch (auth) {
-      case NoAuth():
+      case NoAuth() || InheritAuth():
         break;
       case BearerAuth(:final token):
         final t = r(token).trim();

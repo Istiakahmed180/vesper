@@ -2,6 +2,8 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/errors/app_failure.dart';
 import '../../../core/utils/json_read.dart';
 import '../../api_client/domain/models/api_request.dart';
+import '../../api_client/domain/models/request_auth.dart';
+import '../../collections/domain/collection_models.dart';
 import '../../collections/domain/collection_repository.dart';
 import '../../environments/domain/environment_models.dart';
 
@@ -108,6 +110,13 @@ class VesperCollectionCodec implements CollectionImporter {
     'collection': {
       'name': doc.name,
       if (doc.description.isNotEmpty) 'description': doc.description,
+      if (doc.settings.auth is! NoAuth)
+        'auth': doc.settings.auth.toJson(includeSecrets: includeSecrets),
+      if (doc.settings.variables.isNotEmpty)
+        'variables': [
+          for (final v in doc.settings.variables)
+            v.toJson(includeSecrets: includeSecrets),
+        ],
       'items': _encodeItems(doc.items, includeSecrets),
     },
   };
@@ -150,11 +159,20 @@ class VesperCollectionCodec implements CollectionImporter {
     final name = counter
         .text(collection['name'], fallback: 'Imported collection')
         .trim();
+    final auth = RequestAuth.fromJson(collection.obj('auth'));
+    final variables = collection.objList('variables');
+    if (variables.length > 5000) {
+      throw const ImportFailure('The collection has too many variables.');
+    }
     return ImportResult(
       CollectionDocument(
         name: name.isEmpty ? 'Imported collection' : name,
         description: counter.text(collection['description']),
         items: _decodeItems(collection.objList('items'), counter, 1),
+        settings: CollectionSettings(
+          auth: auth is InheritAuth ? const NoAuth() : auth,
+          variables: [for (final v in variables) EnvVariable.fromJson(v)],
+        ),
       ),
       source: name,
     );

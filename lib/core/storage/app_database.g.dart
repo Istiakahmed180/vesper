@@ -476,6 +476,30 @@ class $CollectionsTable extends Collections
     requiredDuringInsert: false,
     defaultValue: const Constant(''),
   );
+  static const VerificationMeta _authJsonMeta = const VerificationMeta(
+    'authJson',
+  );
+  @override
+  late final GeneratedColumn<String> authJson = GeneratedColumn<String>(
+    'auth_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('{}'),
+  );
+  static const VerificationMeta _variablesJsonMeta = const VerificationMeta(
+    'variablesJson',
+  );
+  @override
+  late final GeneratedColumn<String> variablesJson = GeneratedColumn<String>(
+    'variables_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('[]'),
+  );
   static const VerificationMeta _sortOrderMeta = const VerificationMeta(
     'sortOrder',
   );
@@ -516,6 +540,8 @@ class $CollectionsTable extends Collections
     workspaceId,
     name,
     description,
+    authJson,
+    variablesJson,
     sortOrder,
     createdAt,
     updatedAt,
@@ -560,6 +586,21 @@ class $CollectionsTable extends Collections
         description.isAcceptableOrUnknown(
           data['description']!,
           _descriptionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('auth_json')) {
+      context.handle(
+        _authJsonMeta,
+        authJson.isAcceptableOrUnknown(data['auth_json']!, _authJsonMeta),
+      );
+    }
+    if (data.containsKey('variables_json')) {
+      context.handle(
+        _variablesJsonMeta,
+        variablesJson.isAcceptableOrUnknown(
+          data['variables_json']!,
+          _variablesJsonMeta,
         ),
       );
     }
@@ -610,6 +651,14 @@ class $CollectionsTable extends Collections
         DriftSqlType.string,
         data['${effectivePrefix}description'],
       )!,
+      authJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}auth_json'],
+      )!,
+      variablesJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}variables_json'],
+      )!,
       sortOrder: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}sort_order'],
@@ -636,6 +685,12 @@ class CollectionRow extends DataClass implements Insertable<CollectionRow> {
   final String workspaceId;
   final String name;
   final String description;
+
+  /// Collection authorization without secrets (those are in the vault).
+  final String authJson;
+
+  /// Collection variables; secret values are empty here (kept in the vault).
+  final String variablesJson;
   final int sortOrder;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -644,6 +699,8 @@ class CollectionRow extends DataClass implements Insertable<CollectionRow> {
     required this.workspaceId,
     required this.name,
     required this.description,
+    required this.authJson,
+    required this.variablesJson,
     required this.sortOrder,
     required this.createdAt,
     required this.updatedAt,
@@ -655,6 +712,8 @@ class CollectionRow extends DataClass implements Insertable<CollectionRow> {
     map['workspace_id'] = Variable<String>(workspaceId);
     map['name'] = Variable<String>(name);
     map['description'] = Variable<String>(description);
+    map['auth_json'] = Variable<String>(authJson);
+    map['variables_json'] = Variable<String>(variablesJson);
     map['sort_order'] = Variable<int>(sortOrder);
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
@@ -667,6 +726,8 @@ class CollectionRow extends DataClass implements Insertable<CollectionRow> {
       workspaceId: Value(workspaceId),
       name: Value(name),
       description: Value(description),
+      authJson: Value(authJson),
+      variablesJson: Value(variablesJson),
       sortOrder: Value(sortOrder),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
@@ -683,6 +744,8 @@ class CollectionRow extends DataClass implements Insertable<CollectionRow> {
       workspaceId: serializer.fromJson<String>(json['workspaceId']),
       name: serializer.fromJson<String>(json['name']),
       description: serializer.fromJson<String>(json['description']),
+      authJson: serializer.fromJson<String>(json['authJson']),
+      variablesJson: serializer.fromJson<String>(json['variablesJson']),
       sortOrder: serializer.fromJson<int>(json['sortOrder']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
@@ -696,6 +759,8 @@ class CollectionRow extends DataClass implements Insertable<CollectionRow> {
       'workspaceId': serializer.toJson<String>(workspaceId),
       'name': serializer.toJson<String>(name),
       'description': serializer.toJson<String>(description),
+      'authJson': serializer.toJson<String>(authJson),
+      'variablesJson': serializer.toJson<String>(variablesJson),
       'sortOrder': serializer.toJson<int>(sortOrder),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
@@ -707,6 +772,8 @@ class CollectionRow extends DataClass implements Insertable<CollectionRow> {
     String? workspaceId,
     String? name,
     String? description,
+    String? authJson,
+    String? variablesJson,
     int? sortOrder,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -715,6 +782,8 @@ class CollectionRow extends DataClass implements Insertable<CollectionRow> {
     workspaceId: workspaceId ?? this.workspaceId,
     name: name ?? this.name,
     description: description ?? this.description,
+    authJson: authJson ?? this.authJson,
+    variablesJson: variablesJson ?? this.variablesJson,
     sortOrder: sortOrder ?? this.sortOrder,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
@@ -729,6 +798,10 @@ class CollectionRow extends DataClass implements Insertable<CollectionRow> {
       description: data.description.present
           ? data.description.value
           : this.description,
+      authJson: data.authJson.present ? data.authJson.value : this.authJson,
+      variablesJson: data.variablesJson.present
+          ? data.variablesJson.value
+          : this.variablesJson,
       sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
@@ -742,6 +815,8 @@ class CollectionRow extends DataClass implements Insertable<CollectionRow> {
           ..write('workspaceId: $workspaceId, ')
           ..write('name: $name, ')
           ..write('description: $description, ')
+          ..write('authJson: $authJson, ')
+          ..write('variablesJson: $variablesJson, ')
           ..write('sortOrder: $sortOrder, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
@@ -755,6 +830,8 @@ class CollectionRow extends DataClass implements Insertable<CollectionRow> {
     workspaceId,
     name,
     description,
+    authJson,
+    variablesJson,
     sortOrder,
     createdAt,
     updatedAt,
@@ -767,6 +844,8 @@ class CollectionRow extends DataClass implements Insertable<CollectionRow> {
           other.workspaceId == this.workspaceId &&
           other.name == this.name &&
           other.description == this.description &&
+          other.authJson == this.authJson &&
+          other.variablesJson == this.variablesJson &&
           other.sortOrder == this.sortOrder &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
@@ -777,6 +856,8 @@ class CollectionsCompanion extends UpdateCompanion<CollectionRow> {
   final Value<String> workspaceId;
   final Value<String> name;
   final Value<String> description;
+  final Value<String> authJson;
+  final Value<String> variablesJson;
   final Value<int> sortOrder;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
@@ -786,6 +867,8 @@ class CollectionsCompanion extends UpdateCompanion<CollectionRow> {
     this.workspaceId = const Value.absent(),
     this.name = const Value.absent(),
     this.description = const Value.absent(),
+    this.authJson = const Value.absent(),
+    this.variablesJson = const Value.absent(),
     this.sortOrder = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -796,6 +879,8 @@ class CollectionsCompanion extends UpdateCompanion<CollectionRow> {
     this.workspaceId = const Value.absent(),
     required String name,
     this.description = const Value.absent(),
+    this.authJson = const Value.absent(),
+    this.variablesJson = const Value.absent(),
     this.sortOrder = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
@@ -809,6 +894,8 @@ class CollectionsCompanion extends UpdateCompanion<CollectionRow> {
     Expression<String>? workspaceId,
     Expression<String>? name,
     Expression<String>? description,
+    Expression<String>? authJson,
+    Expression<String>? variablesJson,
     Expression<int>? sortOrder,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
@@ -819,6 +906,8 @@ class CollectionsCompanion extends UpdateCompanion<CollectionRow> {
       if (workspaceId != null) 'workspace_id': workspaceId,
       if (name != null) 'name': name,
       if (description != null) 'description': description,
+      if (authJson != null) 'auth_json': authJson,
+      if (variablesJson != null) 'variables_json': variablesJson,
       if (sortOrder != null) 'sort_order': sortOrder,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -831,6 +920,8 @@ class CollectionsCompanion extends UpdateCompanion<CollectionRow> {
     Value<String>? workspaceId,
     Value<String>? name,
     Value<String>? description,
+    Value<String>? authJson,
+    Value<String>? variablesJson,
     Value<int>? sortOrder,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
@@ -841,6 +932,8 @@ class CollectionsCompanion extends UpdateCompanion<CollectionRow> {
       workspaceId: workspaceId ?? this.workspaceId,
       name: name ?? this.name,
       description: description ?? this.description,
+      authJson: authJson ?? this.authJson,
+      variablesJson: variablesJson ?? this.variablesJson,
       sortOrder: sortOrder ?? this.sortOrder,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -862,6 +955,12 @@ class CollectionsCompanion extends UpdateCompanion<CollectionRow> {
     }
     if (description.present) {
       map['description'] = Variable<String>(description.value);
+    }
+    if (authJson.present) {
+      map['auth_json'] = Variable<String>(authJson.value);
+    }
+    if (variablesJson.present) {
+      map['variables_json'] = Variable<String>(variablesJson.value);
     }
     if (sortOrder.present) {
       map['sort_order'] = Variable<int>(sortOrder.value);
@@ -885,6 +984,8 @@ class CollectionsCompanion extends UpdateCompanion<CollectionRow> {
           ..write('workspaceId: $workspaceId, ')
           ..write('name: $name, ')
           ..write('description: $description, ')
+          ..write('authJson: $authJson, ')
+          ..write('variablesJson: $variablesJson, ')
           ..write('sortOrder: $sortOrder, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
@@ -4747,6 +4848,8 @@ typedef $$CollectionsTableCreateCompanionBuilder =
       Value<String> workspaceId,
       required String name,
       Value<String> description,
+      Value<String> authJson,
+      Value<String> variablesJson,
       Value<int> sortOrder,
       required DateTime createdAt,
       required DateTime updatedAt,
@@ -4758,6 +4861,8 @@ typedef $$CollectionsTableUpdateCompanionBuilder =
       Value<String> workspaceId,
       Value<String> name,
       Value<String> description,
+      Value<String> authJson,
+      Value<String> variablesJson,
       Value<int> sortOrder,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
@@ -4832,6 +4937,16 @@ class $$CollectionsTableFilterComposer
 
   ColumnFilters<String> get description => $composableBuilder(
     column: $table.description,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get authJson => $composableBuilder(
+    column: $table.authJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get variablesJson => $composableBuilder(
+    column: $table.variablesJson,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4930,6 +5045,16 @@ class $$CollectionsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get authJson => $composableBuilder(
+    column: $table.authJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get variablesJson => $composableBuilder(
+    column: $table.variablesJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get sortOrder => $composableBuilder(
     column: $table.sortOrder,
     builder: (column) => ColumnOrderings(column),
@@ -4968,6 +5093,14 @@ class $$CollectionsTableAnnotationComposer
 
   GeneratedColumn<String> get description => $composableBuilder(
     column: $table.description,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get authJson =>
+      $composableBuilder(column: $table.authJson, builder: (column) => column);
+
+  GeneratedColumn<String> get variablesJson => $composableBuilder(
+    column: $table.variablesJson,
     builder: (column) => column,
   );
 
@@ -5063,6 +5196,8 @@ class $$CollectionsTableTableManager
                 Value<String> workspaceId = const Value.absent(),
                 Value<String> name = const Value.absent(),
                 Value<String> description = const Value.absent(),
+                Value<String> authJson = const Value.absent(),
+                Value<String> variablesJson = const Value.absent(),
                 Value<int> sortOrder = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
@@ -5072,6 +5207,8 @@ class $$CollectionsTableTableManager
                 workspaceId: workspaceId,
                 name: name,
                 description: description,
+                authJson: authJson,
+                variablesJson: variablesJson,
                 sortOrder: sortOrder,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
@@ -5083,6 +5220,8 @@ class $$CollectionsTableTableManager
                 Value<String> workspaceId = const Value.absent(),
                 required String name,
                 Value<String> description = const Value.absent(),
+                Value<String> authJson = const Value.absent(),
+                Value<String> variablesJson = const Value.absent(),
                 Value<int> sortOrder = const Value.absent(),
                 required DateTime createdAt,
                 required DateTime updatedAt,
@@ -5092,6 +5231,8 @@ class $$CollectionsTableTableManager
                 workspaceId: workspaceId,
                 name: name,
                 description: description,
+                authJson: authJson,
+                variablesJson: variablesJson,
                 sortOrder: sortOrder,
                 createdAt: createdAt,
                 updatedAt: updatedAt,

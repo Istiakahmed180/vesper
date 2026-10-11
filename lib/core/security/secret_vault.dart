@@ -29,6 +29,12 @@ class VaultKeys {
       '${prefix}env.$environmentId.var.$variableId';
   static String environmentPrefix(String environmentId) =>
       '${prefix}env.$environmentId.';
+  static String collectionAuth(String collectionId, String field) =>
+      '${prefix}collection.$collectionId.auth.$field';
+  static String collectionVariable(String collectionId, String variableId) =>
+      '${prefix}collection.$collectionId.var.$variableId';
+  static String collectionPrefix(String collectionId) =>
+      '${prefix}collection.$collectionId.';
   static const googleSession = '${prefix}auth.google.session';
   static const githubSession = '${prefix}auth.github.session';
 }

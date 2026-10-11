@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../../../../core/utils/json_read.dart';
 
 enum AuthType {
+  inherit('Inherit auth from parent'),
   none('No Auth'),
   bearer('Bearer Token'),
   basic('Basic Auth'),
@@ -43,6 +44,8 @@ sealed class RequestAuth {
 
   static RequestAuth fromJson(JsonMap json) {
     switch (json.str('type')) {
+      case 'inherit':
+        return const InheritAuth();
       case 'bearer':
         return BearerAuth(token: json.str('token'));
       case 'basic':
@@ -79,12 +82,40 @@ sealed class RequestAuth {
   }
 
   static RequestAuth empty(AuthType type) => switch (type) {
+    AuthType.inherit => const InheritAuth(),
     AuthType.none => const NoAuth(),
     AuthType.bearer => const BearerAuth(),
     AuthType.basic => const BasicAuth(),
     AuthType.apiKey => const ApiKeyAuth(),
     AuthType.oauth2 => const OAuth2Auth(),
   };
+}
+
+/// Uses the authorization of the request's collection when it is sent.
+class InheritAuth extends RequestAuth {
+  const InheritAuth();
+
+  @override
+  AuthType get type => AuthType.inherit;
+
+  @override
+  Map<String, String> get secrets => const {};
+
+  @override
+  RequestAuth withSecrets(Map<String, String> secrets) => this;
+
+  @override
+  JsonMap toJson({bool includeSecrets = false}) => {'type': 'inherit'};
+
+  /// The authorization actually sent: [inherited] for [InheritAuth].
+  static RequestAuth effective(RequestAuth auth, RequestAuth? inherited) =>
+      auth is InheritAuth ? (inherited ?? const NoAuth()) : auth;
+
+  @override
+  bool operator ==(Object other) => other is InheritAuth;
+
+  @override
+  int get hashCode => 1;
 }
 
 class NoAuth extends RequestAuth {

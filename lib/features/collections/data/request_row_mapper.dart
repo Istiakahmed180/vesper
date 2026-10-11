@@ -30,11 +30,11 @@ class RequestRowMapper {
     name: row.name,
     method: HttpMethod.parse(row.method),
     url: row.url,
-    params: KeyValueList.fromJson(_list(row.paramsJson)),
-    headers: KeyValueList.fromJson(_list(row.headersJson)),
-    body: RequestBody.fromJson(_map(row.bodyJson)),
-    auth: RequestAuth.fromJson(_map(row.authJson)),
-    options: RequestOptions.fromJson(_map(row.optionsJson)),
+    params: KeyValueList.fromJson(decodeList(row.paramsJson)),
+    headers: KeyValueList.fromJson(decodeList(row.headersJson)),
+    body: RequestBody.fromJson(decodeMap(row.bodyJson)),
+    auth: RequestAuth.fromJson(decodeMap(row.authJson)),
+    options: RequestOptions.fromJson(decodeMap(row.optionsJson)),
     description: row.description,
     collectionId: row.collectionId,
     folderId: row.folderId,
@@ -61,7 +61,8 @@ class RequestRowMapper {
     updatedAt: Value(r.updatedAt),
   );
 
-  static JsonMap _map(String raw) {
+  /// Decodes a JSON object column; malformed data yields an empty map.
+  static JsonMap decodeMap(String raw) {
     try {
       final v = jsonDecode(raw);
       return v is Map ? v.cast<String, Object?>() : {};
@@ -70,7 +71,8 @@ class RequestRowMapper {
     }
   }
 
-  static List<JsonMap> _list(String raw) {
+  /// Decodes a JSON array column; malformed data yields an empty list.
+  static List<JsonMap> decodeList(String raw) {
     try {
       final v = jsonDecode(raw);
       if (v is! List) return const [];

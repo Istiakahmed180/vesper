@@ -7,11 +7,15 @@ class CollectionDocument {
     required this.name,
     this.description = '',
     this.items = const [],
+    this.settings = const CollectionSettings(),
   });
 
   final String name;
   final String description;
   final List<CollectionItem> items;
+
+  /// Collection-level authorization and variables.
+  final CollectionSettings settings;
 }
 
 sealed class CollectionItem {
@@ -42,6 +46,16 @@ abstract class CollectionRepository {
 
   /// Moves a collection with everything in it to another workspace.
   Future<void> moveCollectionToWorkspace(String id, String workspaceId);
+
+  /// Collection authorization and variables, secrets included. Null when the
+  /// collection does not exist.
+  Future<CollectionSettings?> getSettings(String id);
+
+  /// Emits [getSettings] whenever collections change.
+  Stream<CollectionSettings?> watchSettings(String id);
+
+  /// Persists collection settings, routing secrets to the vault.
+  Future<void> saveSettings(String id, CollectionSettings settings);
 
   Future<Folder> createFolder(
     String collectionId,

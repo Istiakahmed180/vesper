@@ -7,6 +7,7 @@ import '../../../shared/widgets/dialogs.dart';
 import '../../../shared/widgets/method_badge.dart';
 import '../../../shared/widgets/section_tabs.dart';
 import '../../api_client/domain/models/api_request.dart';
+import '../../api_client/domain/models/request_auth.dart';
 import '../../import_export/presentation/import_export_actions.dart';
 import '../../sync/presentation/sync_dialog.dart';
 import '../../workspace/domain/workspace_models.dart';
@@ -190,6 +191,7 @@ Future<void> _addRequest(
             name: 'New request',
             collectionId: loc.collectionId,
             folderId: loc.folderId,
+            auth: const InheritAuth(),
           ),
         ),
   );
@@ -354,6 +356,15 @@ class _CollectionRow extends ConsumerWidget {
           dropHighlight: candidates.isNotEmpty,
           onTap: () => ref.read(expandedNodesProvider.notifier).toggle(c.id),
           menu: [
+            MenuItemButton(
+              key: const ValueKey('collection-settings'),
+              leadingIcon: const Icon(Icons.tune, size: 16),
+              onPressed: () => ref
+                  .read(workspaceProvider.notifier)
+                  .openCollection(c.id, c.name),
+              child: const Text('Authorization & variables…'),
+            ),
+            const Divider(),
             MenuItemButton(
               leadingIcon: const Icon(Icons.add, size: 16),
               onPressed: () => _addRequest(context, ref, loc),

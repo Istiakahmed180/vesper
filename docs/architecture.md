@@ -23,7 +23,7 @@ ApiRequest (draft in a tab)
    │    • build body (text / url-encoded / multipart / file) + implied Content-Type
    │    • validate URL (scheme, host, unresolved variables)
    ▼
-PreparedRequest ──► CurlGenerator ("Copy as cURL")
+PreparedRequest ──► CurlGenerator ("Copy as cURL") and CodeSnippetGenerator (code snippet dialog)
    │
    │  HttpClientPort.send  (DioHttpClient)
    │    • proxy / SSL / redirect settings, session cookie jar
@@ -70,4 +70,5 @@ Automatic provider retries are disabled (`retry: (_, _) => null`). Failures surf
 | URL text is the query source of truth | Lossless round trips and no divergence between the URL and the params table. |
 | Cookies live in memory per session | Session cookies never touch disk; see security.md. |
 | Unsaved drafts are not persisted across restarts | Drafts may contain literal secrets; only saved requests reopen. |
-| Collection-level auth and variables are not implemented | Requests carry their own auth; Postman collection-level auth and variables produce import warnings. Future work. |
+| Collection auth and variables, no folder level | Requests set to `InheritAuth` use their collection's auth (applied in `RequestPreparer`). Postman folder auth is copied onto the inheriting requests below the folder on import. |
+| Variable scopes: environment → collection → globals | `requestResolverProvider(collectionId)` adds the collection scope; widgets find the collection through `VariableScope`, so highlighting, autocomplete and previews match what is sent. |

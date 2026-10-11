@@ -1,10 +1,15 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart';
 
 import '../../../core/errors/app_failure.dart';
 import '../../../core/security/secret_vault.dart';
 import '../../../core/storage/app_database.dart';
 import '../../../core/utils/id.dart';
+import '../../../core/utils/json_read.dart';
 import '../../api_client/domain/models/api_request.dart';
+import '../../api_client/domain/models/request_auth.dart';
+import '../../environments/domain/environment_models.dart';
 import '../domain/collection_models.dart';
 import '../domain/collection_repository.dart';
 import 'request_row_mapper.dart';
@@ -194,6 +199,8 @@ class DriftCollectionRepository implements CollectionRepository {
             .get();
     await (_db.delete(_db.collections)..where((c) => c.id.equals(id))).go();
     await _deleteSecrets(ids);
+    final prefix = VaultKeys.collectionPrefix(id);
+    await _vault.deleteWhere((k) => k.startsWith(prefix));
   }
 
   @override
@@ -235,6 +242,132 @@ class DriftCollectionRepository implements CollectionRepository {
         sortOrder: Value((top.read(max) ?? -1) + 1),
         updatedAt: Value(DateTime.now()),
       ),
+    );
+  }
+
+  // ---------------------------------------------------- collection settings
+
+  @override
+  Future<CollectionSettings?> getSettings(String id) async {
+    final row = await (_db.select(
+      _db.collections,
+    )..where((c) => c.id.equals(id))).getSingleOrNull();
+    if (row == null) return null;
+    final stored = _settingsFromRow(row);
+    final authSecrets = <String, String>{};
+    for (final field in RequestRowMapper.secretFields) {
+      final v = await _vault.read(VaultKeys.collectionAuth(id, field));
+      if (v != null) authSecrets[field] = v;
+    }
+    return CollectionSettings(
+      auth: authSecrets.isEmpty
+          ? stored.auth
+          : stored.auth.withSecrets(authSecrets),
+      variables: [
+        for (final v in stored.variables)
+          v.isSecret
+              ? v.copyWith(
+                  value:
+                      await _vault.read(
+                        VaultKeys.collectionVariable(id, v.id),
+                      ) ??
+                      '',
+                )
+              : v,
+      ],
+    );
+  }
+
+  @override
+  Stream<CollectionSettings?> watchSettings(String id) => _db
+      .customSelect(
+        'SELECT 1 AS collection_settings_tick',
+        readsFrom: {_db.collections},
+      )
+      .watch()
+      .asyncMap((_) => getSettings(id))
+      .distinct();
+
+  static CollectionSettings _settingsFromRow(CollectionRow row) {
+    final auth = RequestAuth.fromJson(RequestRowMapper.decodeMap(row.authJson));
+    return CollectionSettings(
+      auth: auth is InheritAuth ? const NoAuth() : auth,
+      variables: [
+        for (final v in RequestRowMapper.decodeList(row.variablesJson))
+          EnvVariable(
+            id: v.strOrNull('id'),
+            key: v.str('key'),
+            value: v.str('value'),
+            enabled: v.boolean('enabled', true),
+            isSecret: v.boolean('secret'),
+          ),
+      ],
+    );
+  }
+
+  @override
+  Future<void> saveSettings(String id, CollectionSettings settings) async {
+    final auth = settings.auth is InheritAuth ? const NoAuth() : settings.auth;
+    final variables = [
+      for (final v in settings.variables)
+        if (v.key.trim().isNotEmpty || v.value.isNotEmpty) v,
+    ];
+    final updated =
+        await (_db.update(
+          _db.collections,
+        )..where((c) => c.id.equals(id))).write(
+          CollectionsCompanion(
+            authJson: Value(jsonEncode(auth.toJson())),
+            variablesJson: Value(
+              jsonEncode([
+                for (final v in variables) {'id': v.id, ...v.toJson()},
+              ]),
+            ),
+            updatedAt: Value(DateTime.now()),
+          ),
+        );
+    if (updated == 0) {
+      throw const StorageFailure('The collection no longer exists.');
+    }
+
+    final keep = <String>{};
+    for (final MapEntry(:key, :value) in auth.secrets.entries) {
+      final vaultKey = VaultKeys.collectionAuth(id, key);
+      keep.add(vaultKey);
+      await _vault.write(vaultKey, value);
+    }
+    for (final v in variables.where((v) => v.isSecret && v.value.isNotEmpty)) {
+      final vaultKey = VaultKeys.collectionVariable(id, v.id);
+      keep.add(vaultKey);
+      await _vault.write(vaultKey, v.value);
+    }
+    final prefix = VaultKeys.collectionPrefix(id);
+    await _vault.deleteWhere((k) => k.startsWith(prefix) && !keep.contains(k));
+  }
+
+  /// [incoming] with secrets it lacks taken from [current]: synced files
+  /// never carry secrets, so a pull must not erase the local ones.
+  static CollectionSettings _keepLocalSecrets(
+    CollectionSettings incoming,
+    CollectionSettings? current,
+  ) {
+    if (current == null) return incoming;
+    final auth =
+        incoming.auth.type == current.auth.type && incoming.auth.secrets.isEmpty
+        ? incoming.auth.withSecrets(current.auth.secrets)
+        : incoming.auth;
+    final localSecrets = {
+      for (final v in current.variables)
+        if (v.isSecret) v.key: v.value,
+    };
+    return CollectionSettings(
+      auth: auth,
+      variables: [
+        for (final v in incoming.variables)
+          v.isSecret && v.value.isEmpty && localSecrets.containsKey(v.key)
+              ? v.copyWith(value: localSecrets[v.key])
+              : v,
+      ],
     );
   }
 
@@ -471,6 +604,7 @@ class DriftCollectionRepository implements CollectionRepository {
     if (tree == null) {
       throw const StorageFailure('The collection no longer exists.');
     }
+    final settings = await getSettings(id) ?? const CollectionSettings();
     return CollectionDocument(
       name: tree.collection.name,
       description: tree.collection.description,
@@ -478,6 +612,15 @@ class DriftCollectionRepository implements CollectionRepository {
         tree.children,
         includeSecrets: includeSecrets,
       ),
+      settings: includeSecrets
+          ? settings
+          : CollectionSettings(
+              auth: settings.auth.withoutSecrets,
+              variables: [
+                for (final v in settings.variables)
+                  v.isSecret ? v.copyWith(value: '') : v,
+              ],
+            ),
     );
   }
 
@@ -513,11 +656,18 @@ class DriftCollectionRepository implements CollectionRepository {
     await _db.transaction(
       () => _insertItems(document.items, collection.id, null),
     );
+    if (!document.settings.isEmpty) {
+      await saveSettings(collection.id, document.settings);
+    }
     return collection.id;
   }
 
   @override
   Future<void> replaceCollection(String id, CollectionDocument document) async {
+    final settings = _keepLocalSecrets(
+      document.settings,
+      await getSettings(id),
+    );
     final oldIds =
         await (_db.selectOnly(_db.requests)
               ..addColumns([_db.requests.id])
@@ -539,6 +689,7 @@ class DriftCollectionRepository implements CollectionRepository {
       await _insertItems(document.items, id, null);
     });
     await _deleteSecrets(oldIds);
+    await saveSettings(id, settings);
   }
 
   Future<void> _insertItems(

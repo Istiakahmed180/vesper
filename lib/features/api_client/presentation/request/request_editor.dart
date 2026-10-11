@@ -7,6 +7,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/key_value_editor.dart';
 import '../../../../shared/widgets/section_tabs.dart';
 import '../../../../shared/widgets/split_view.dart';
+import '../../../../shared/widgets/variable_scope.dart';
 import '../../../collections/presentation/collection_providers.dart';
 import '../../../environments/presentation/environment_providers.dart';
 import '../../../workspace/presentation/workspace_controller.dart';
@@ -34,18 +35,24 @@ class EditorSection extends Notifier<int> {
 }
 
 /// Request builder (top) and response viewer (bottom) for one tab.
-class RequestWorkspace extends StatelessWidget {
+class RequestWorkspace extends ConsumerWidget {
   const RequestWorkspace({super.key, required this.tabId});
   final String tabId;
 
   @override
-  Widget build(BuildContext context) => SplitView(
-    axis: Axis.vertical,
-    initialFraction: 0.48,
-    minFirst: 170,
-    minSecond: 140,
-    first: RequestEditor(tabId: tabId),
-    second: ResponsePanel(tabId: tabId),
+  Widget build(BuildContext context, WidgetRef ref) => VariableScope(
+    // Saved requests also see their collection's variables.
+    collectionId: ref.watch(
+      requestTabProvider(tabId).select((t) => t?.draft.collectionId),
+    ),
+    child: SplitView(
+      axis: Axis.vertical,
+      initialFraction: 0.48,
+      minFirst: 170,
+      minSecond: 140,
+      first: RequestEditor(tabId: tabId),
+      second: ResponsePanel(tabId: tabId),
+    ),
   );
 }
 
@@ -316,7 +323,7 @@ class _VariablePreview extends ConsumerWidget {
         ref.watch(requestTabProvider(tabId).select((t) => t?.draft.url)) ?? '';
     final names = VariableResolver.referencedNames(url).toSet().toList();
     if (names.isEmpty) return const SizedBox.shrink();
-    final resolver = ref.watch(variableResolverProvider);
+    final resolver = VariableScope.watch(ref, context);
     final env = ref.watch(activeEnvironmentProvider);
     final colors = context.colors;
     return Padding(

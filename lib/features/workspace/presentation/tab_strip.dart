@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/platform_keys.dart';
 import '../../../shared/widgets/method_badge.dart';
+import '../../collections/presentation/collection_providers.dart';
 import '../../environments/presentation/environment_providers.dart';
 import '../../environments/presentation/environments_panel.dart';
 import '../domain/workspace_models.dart';
@@ -134,6 +135,17 @@ class _TabItemState extends ConsumerState<_TabItem> {
               ),
             ) ??
             name,
+      CollectionTab(:final collectionId, :final name) =>
+        ref.watch(
+              collectionTreesProvider.select(
+                (t) => t.value
+                    ?.where((x) => x.collection.id == collectionId)
+                    .firstOrNull
+                    ?.collection
+                    .name,
+              ),
+            ) ??
+            name,
     };
 
     return MenuAnchor(
@@ -188,7 +200,9 @@ class _TabItemState extends ConsumerState<_TabItem> {
                     Padding(
                       padding: const EdgeInsets.only(right: 6),
                       child: Icon(
-                        Icons.layers_outlined,
+                        tab is CollectionTab
+                            ? Icons.folder_copy_outlined
+                            : Icons.layers_outlined,
                         size: 14,
                         color: colors.textSecondary,
                       ),

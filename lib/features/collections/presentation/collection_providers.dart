@@ -1,6 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/app_providers.dart';
+import '../../api_client/domain/models/request_auth.dart';
+import '../../api_client/domain/services/variable_resolver.dart';
+import '../../environments/presentation/environment_providers.dart';
 import '../domain/collection_models.dart';
 
 final collectionTreesProvider = StreamProvider<List<CollectionTree>>(
@@ -71,4 +74,39 @@ class ExpandedNodes extends Notifier<Set<String>> {
       state = state.contains(id) ? ({...state}..remove(id)) : {...state, id};
 
   void expand(Iterable<String> ids) => state = {...state, ...ids};
+}
+
+/// Authorization and variables of a collection (secrets included).
+final collectionSettingsProvider =
+    StreamProvider.family<CollectionSettings?, String>(
+      (ref, id) => ref.watch(collectionRepositoryProvider).watchSettings(id),
+    );
+
+/// Variable resolver for a request in [collectionId]: the active environment,
+/// then the collection's variables, then the Globals.
+final requestResolverProvider = Provider.family<VariableResolver, String?>((
+  ref,
+  collectionId,
+) {
+  final base = ref.watch(variableResolverProvider);
+  if (collectionId == null) return base;
+  final settings = ref.watch(collectionSettingsProvider(collectionId)).value;
+  return settings == null ? base : base.withCollection(settings.toScope());
+});
+
+/// What a request in [collectionId] needs to be sent: the resolver and the
+/// authorization it inherits. Waits for the collection settings to load.
+Future<({VariableResolver resolver, RequestAuth? inheritedAuth})>
+loadRequestContext(
+  Future<CollectionSettings?> Function(String id) settingsOf,
+  VariableResolver base,
+  String? collectionId,
+) async {
+  if (collectionId == null) return (resolver: base, inheritedAuth: null);
+  final settings = await settingsOf(collectionId);
+  if (settings == null) return (resolver: base, inheritedAuth: null);
+  return (
+    resolver: base.withCollection(settings.toScope()),
+    inheritedAuth: settings.auth,
+  );
 }
