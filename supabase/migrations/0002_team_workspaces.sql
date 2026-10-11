@@ -123,8 +123,13 @@ begin
 end;
 $$;
 
-revoke all on function public.share_workspace(text, text) from anon;
-revoke all on function public.accept_workspace_invites() from anon;
+-- New functions are executable by PUBLIC by default; keep them for
+-- signed-in users only (see also 0003_restrict_functions.sql).
+revoke execute on function public.share_workspace(text, text) from public, anon;
+revoke execute on function public.accept_workspace_invites() from public, anon;
+revoke execute on function public.is_workspace_member(text) from public, anon;
+revoke execute on function public.is_workspace_owner(text) from public, anon;
+revoke execute on function public.current_email() from public, anon;
 grant execute on function public.share_workspace(text, text) to authenticated;
 grant execute on function public.accept_workspace_invites() to authenticated;
 grant execute on function public.is_workspace_member(text) to authenticated;

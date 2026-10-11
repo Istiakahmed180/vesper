@@ -78,6 +78,20 @@ class CloudSyncState {
   );
 }
 
+/// Names of shared workspaces the user was just added to, for a one-time
+/// notice.
+final joinedWorkspacesProvider =
+    NotifierProvider<JoinedWorkspaces, List<String>>(JoinedWorkspaces.new);
+
+class JoinedWorkspaces extends Notifier<List<String>> {
+  @override
+  List<String> build() => const [];
+
+  void announce(List<String> names) => state = names;
+
+  void clear() => state = const [];
+}
+
 final cloudSyncProvider = NotifierProvider<CloudSyncController, CloudSyncState>(
   CloudSyncController.new,
 );
@@ -290,10 +304,12 @@ class CloudSyncController extends Notifier<CloudSyncState> {
         try {
           await engine.sync();
           if (generation != _generation) return;
+          final memberships = await _local!.readMemberships();
+          await _announceJoined(memberships);
           state = state.copyWith(
             CloudSyncPhase.synced,
             lastSyncedAt: DateTime.now(),
-            sharedWorkspaces: await _local!.readMemberships(),
+            sharedWorkspaces: memberships,
           );
         } catch (e) {
           if (generation != _generation) return;
@@ -332,6 +348,27 @@ class CloudSyncController extends Notifier<CloudSyncState> {
   /// the cloud and comes back at the next sign-in. Vault secrets are kept:
   /// they are keyed by item id and reattach when the items return.
   // ------------------------------------------------------- team workspaces
+
+  /// Reports workspaces someone else shared with this user that this
+  /// computer has not announced before (kept per user, across sign-outs).
+  Future<void> _announceJoined(Map<String, WorkspaceRole> memberships) async {
+    final userId = _auth?.currentUser?.id;
+    if (userId == null) return;
+    final settings = ref.read(settingsRepositoryProvider);
+    final key = 'cloud.seen_workspaces.$userId';
+    final seen = (await settings.read(key))?.split(',').toSet() ?? <String>{};
+    final joined = [
+      for (final MapEntry(:key, :value) in memberships.entries)
+        if (value == WorkspaceRole.member && !seen.contains(key)) key,
+    ];
+    if (joined.isEmpty) return;
+    await settings.write(key, {...seen, ...joined}.join(','));
+    final repo = ref.read(workspaceRepositoryProvider);
+    final names = [
+      for (final id in joined) (await repo.get(id))?.name ?? 'a workspace',
+    ];
+    ref.read(joinedWorkspacesProvider.notifier).announce(names);
+  }
 
   SupabaseCloudStore _requireStore() {
     final store = _store;

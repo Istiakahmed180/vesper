@@ -128,6 +128,16 @@ class _AppShellState extends ConsumerState<AppShell> with WindowListener {
         );
       }
     });
+    ref.listen(joinedWorkspacesProvider, (_, names) {
+      if (names.isEmpty) return;
+      showToast(
+        context,
+        names.length == 1
+            ? 'You were added to the "${names.single}" workspace.'
+            : 'You were added to ${names.length} workspaces: ${names.join(', ')}.',
+      );
+      ref.read(joinedWorkspacesProvider.notifier).clear();
+    });
     final runner = CommandRunner(ref, context);
     final nativeMenus = ref.watch(nativeMenusProvider);
 
