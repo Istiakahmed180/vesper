@@ -5,6 +5,7 @@ import 'package:supabase/supabase.dart';
 
 import '../../../core/errors/app_failure.dart';
 import '../../../core/logging/app_logger.dart';
+import '../../../core/oauth/loopback_receiver.dart';
 import '../../../core/security/secret_vault.dart';
 import '../domain/cloud_models.dart';
 
@@ -73,6 +74,61 @@ class CloudAuth {
     }
   }
 
+  /// Signs in with GitHub through Supabase (PKCE, browser, loopback
+  /// redirect) and returns the GitHub access token Supabase obtained, which
+  /// Vesper also uses for repository sync.
+  Future<({User user, String githubToken})> signInWithGitHub({
+    required Future<bool> Function(Uri url) openUrl,
+    required String scopes,
+    Future<void>? cancelled,
+  }) async {
+    _persistSessions();
+    final receiver = await LoopbackReceiver.start();
+    try {
+      final OAuthResponse oauth;
+      try {
+        oauth = await client.auth.getOAuthSignInUrl(
+          provider: OAuthProvider.github,
+          redirectTo: receiver.redirectUri,
+          scopes: scopes,
+        );
+      } on AuthException catch (e) {
+        throw SyncFailure('GitHub sign-in could not start: ${e.message}');
+      }
+      if (!await openUrl(Uri.parse(oauth.url))) {
+        throw const AuthFailure(
+          AuthFailureKind.invalidResponse,
+          'Could not open the browser.',
+        );
+      }
+      final params = await receiver.waitForCallback(
+        expectedState: null,
+        cancelled: cancelled,
+      );
+      final Session session;
+      try {
+        session = (await client.auth.exchangeCodeForSession(
+          params['code']!,
+        )).session;
+      } on AuthRetryableFetchException {
+        throw const NetworkFailure(
+          NetworkFailureKind.unknown,
+          'Could not reach the sync server.',
+        );
+      } on AuthException catch (e) {
+        throw SyncFailure('GitHub sign-in was rejected: ${e.message}');
+      }
+      final token = session.providerToken;
+      if (token == null || token.isEmpty) {
+        throw const SyncFailure('GitHub did not return an access token.');
+      }
+      logger.info('Cloud sync signed in', {'provider': 'github'});
+      return (user: session.user, githubToken: token);
+    } finally {
+      await receiver.close();
+    }
+  }
+
   Future<void> signOut() async {
     await _persist?.cancel();
     _persist = null;
@@ -83,6 +139,22 @@ class CloudAuth {
     }
     await vault.delete(VaultKeys.cloudSession);
   }
+}
+
+/// Keeps the PKCE code verifier between starting a browser sign-in and
+/// exchanging its code; both happen in the same app session.
+class MemoryAuthStorage extends GotrueAsyncStorage {
+  final _items = <String, String>{};
+
+  @override
+  Future<String?> getItem({required String key}) async => _items[key];
+
+  @override
+  Future<void> setItem({required String key, required String value}) async =>
+      _items[key] = value;
+
+  @override
+  Future<void> removeItem({required String key}) async => _items.remove(key);
 }
 
 /// [CloudStore] on the Supabase `sync_items` table (see
