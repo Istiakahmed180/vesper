@@ -13,6 +13,7 @@ import 'package:window_manager/window_manager.dart';
 import 'core/constants/app_constants.dart';
 import 'core/di/app_providers.dart';
 import 'core/logging/app_logger.dart';
+import 'core/security/file_secret_vault.dart';
 import 'core/storage/app_database.dart';
 import 'core/storage/vault_migration.dart';
 import 'features/history/data/drift_history_repository.dart';
@@ -102,6 +103,10 @@ Future<ProviderContainer> bootstrap({
         workspaceExists ? savedWorkspace : defaultWorkspaceId,
       ),
       nativeMenusProvider.overrideWithValue(Platform.isMacOS),
+      // An encrypted file instead of the Keychain: no keychain prompts after
+      // rebuilds or updates. Windows keeps its DPAPI-backed storage.
+      if (Platform.isMacOS)
+        vaultProvider.overrideWithValue(FileSecretVault(supportDir)),
       windowManagedProvider.overrideWithValue(true),
       ...overrides,
     ],

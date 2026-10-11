@@ -9,14 +9,14 @@
 | Collection auth secrets and secret collection variables | OS vault | SQLite, logs, history, default exports, GitHub |
 | Google / GitHub sessions | OS vault | SQLite, logs |
 
-The OS vault is `flutter_secure_storage`: macOS Keychain, or Windows Credential Manager with DPAPI encryption.
+The vault (`SecretVault`) is platform specific:
 
-**macOS keychain mode.** Vesper uses the legacy file-based login keychain (`usesDataProtectionKeychain: false`). The data-protection keychain requires the `keychain-access-groups` entitlement and a provisioning profile, which would make ad-hoc and Developer ID builds machine-specific. Items are still encrypted by the keychain and scoped to the app's account name (`co.tdevs.vesper`).
+- **macOS: `FileSecretVault`.** An AES-256-GCM encrypted file (`secrets.vault`) in the app support directory, with its random key in `secrets.key`; both are mode `600`. Vesper is used internally and distributed with ad-hoc signatures, and the Keychain binds items to the code signature, so every rebuild or update asked "Vesper wants to use your confidential information…" for each item. The file vault never prompts. The trade-off: secrets are protected by the macOS user account and file permissions, not by the Keychain, so anyone who can read files as that user (or a backup of the support directory that includes both files) can read them. To go back to the Keychain, remove the `vaultProvider` override in `bootstrap.dart`; `SecureStorageVault` still implements the legacy-keychain index described below.
+- **Windows: `SecureStorageVault`** (`flutter_secure_storage`), which keeps values in a DPAPI-encrypted file tied to the Windows user.
 
-Two consequences of the legacy keychain, both verified on macOS 26:
+Secrets stored in the Keychain by earlier builds are not migrated (reading them would prompt again): sign in again and re-enter saved tokens. Old entries can be removed in Keychain Access by searching for `co.tdevs.vesper`.
 
-- **Enumeration.** The plugin's `readAll()` fails with `errSecParam (-50)` once any item exists. `SecureStorageVault` therefore keeps its own index of stored keys (`vesper.__index__`, which holds key names only, never values), so it never calls `readAll()`. Deleting requests or environments, "Remove all stored secrets" and "Clear local database" rely on this.
-- **Code-signature ACLs.** Keychain items are bound to the code signature of the app that created them. Ad-hoc builds get a new signature on every rebuild, so a rebuilt development app asks for permission ("Vesper wants to access…") the first time it reads an existing item. Builds signed with a stable Developer ID do not have this problem.
+`SecureStorageVault` notes for the macOS legacy keychain (`usesDataProtectionKeychain: false`): the plugin's `readAll()` fails with `errSecParam (-50)` once any item exists, so the vault keeps an index of stored keys (`vesper.__index__`, names only); and items are bound to the creating app's code signature, so ad-hoc rebuilds prompt for access.
 
 ## Where secrets could leak, and how Vesper prevents it
 

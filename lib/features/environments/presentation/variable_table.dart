@@ -13,7 +13,7 @@ class VariableTable extends StatefulWidget {
     required this.variables,
     required this.onChanged,
     this.footer =
-        'Secret values are stored in the system keychain, masked in the UI, '
+        'Secret values are stored encrypted on this computer, masked in the UI, '
         'never written to history and excluded from exports by default.',
   });
 

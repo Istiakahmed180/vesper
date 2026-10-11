@@ -556,8 +556,8 @@ class _SecuritySettings extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final colors = context.colors;
     final store = Platform.isMacOS
-        ? 'macOS Keychain'
-        : 'Windows Credential Manager (DPAPI)';
+        ? 'an encrypted file only your Mac user can read'
+        : 'a DPAPI-encrypted file only your Windows user can read';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [

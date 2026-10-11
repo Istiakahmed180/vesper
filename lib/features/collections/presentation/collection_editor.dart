@@ -173,7 +173,7 @@ class _CollectionEditorState extends ConsumerState<CollectionEditor> {
                         'Use collection variables as {{name}} in the requests of '
                         'this collection. The active environment overrides a '
                         'variable with the same name; collection values override '
-                        'Globals. Secret values are stored in the system keychain.',
+                        'Globals. Secret values are stored encrypted on this computer.',
                   ),
                 },
               ),
