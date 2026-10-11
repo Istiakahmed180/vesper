@@ -48,6 +48,42 @@ class Avatar extends StatelessWidget {
   }
 }
 
+/// Runs Google sign-in in the browser and reports the outcome as a toast.
+/// Completing [cancelled] abandons a sign-in that is still waiting.
+Future<void> signInWithGoogle(
+  BuildContext context,
+  WidgetRef ref,
+  Future<void> cancelled,
+) async {
+  try {
+    await ref.read(authSessionProvider.notifier).signIn(cancelled: cancelled);
+    if (context.mounted) showToast(context, 'Signed in');
+  } on AuthFailure catch (f) {
+    if (context.mounted && f.kind != AuthFailureKind.cancelled) {
+      showToast(context, f.message, error: true);
+    }
+  } catch (e) {
+    if (context.mounted) showToast(context, e.userMessage, error: true);
+  }
+}
+
+/// Asks for confirmation, then signs out of Google.
+Future<void> confirmGoogleSignOut(
+  BuildContext context,
+  WidgetRef ref,
+  String email,
+) async {
+  final ok = await confirmDialog(
+    context,
+    title: 'Sign out',
+    message:
+        'Sign out of $email? Your local collections stay on this computer.',
+    confirmLabel: 'Sign out',
+    destructive: false,
+  );
+  if (ok) await ref.read(authSessionProvider.notifier).signOut();
+}
+
 /// Google account status, sign-in and sign-out.
 class AccountCard extends ConsumerStatefulWidget {
   const AccountCard({super.key});
@@ -62,20 +98,8 @@ class _AccountCardState extends ConsumerState<AccountCard> {
   Future<void> _signIn() async {
     final cancel = Completer<void>();
     setState(() => _cancel = cancel);
-    try {
-      await ref
-          .read(authSessionProvider.notifier)
-          .signIn(cancelled: cancel.future);
-      if (mounted) showToast(context, 'Signed in');
-    } on AuthFailure catch (f) {
-      if (mounted && f.kind != AuthFailureKind.cancelled) {
-        showToast(context, f.message, error: true);
-      }
-    } catch (e) {
-      if (mounted) showToast(context, e.userMessage, error: true);
-    } finally {
-      if (mounted) setState(() => _cancel = null);
-    }
+    await signInWithGoogle(context, ref, cancel.future);
+    if (mounted) setState(() => _cancel = null);
   }
 
   @override
@@ -107,17 +131,7 @@ class _AccountCardState extends ConsumerState<AccountCard> {
         title: s.account.name.isEmpty ? s.account.email : s.account.name,
         subtitle: '${s.account.email}${s.offline ? ' · offline' : ''} · Google',
         trailing: OutlinedButton(
-          onPressed: () async {
-            final ok = await confirmDialog(
-              context,
-              title: 'Sign out',
-              message:
-                  'Sign out of ${s.account.email}? Your local collections stay on this computer.',
-              confirmLabel: 'Sign out',
-              destructive: false,
-            );
-            if (ok) await ref.read(authSessionProvider.notifier).signOut();
-          },
+          onPressed: () => confirmGoogleSignOut(context, ref, s.account.email),
           child: const Text('Sign out'),
         ),
       );
