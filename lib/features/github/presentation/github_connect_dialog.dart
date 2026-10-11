@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/errors/app_failure.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../cloud_sync/presentation/cloud_providers.dart';
 import '../domain/github_models.dart';
 import 'github_providers.dart';
 
@@ -32,6 +33,9 @@ class _GitHubConnectDialog extends ConsumerStatefulWidget {
 class _GitHubConnectDialogState extends ConsumerState<_GitHubConnectDialog> {
   DeviceCode? _code;
   String? _error;
+
+  /// Signing in through the browser (cloud sync builds) instead of a code.
+  bool _browser = false;
   final _cancel = Completer<void>();
 
   @override
@@ -49,6 +53,12 @@ class _GitHubConnectDialogState extends ConsumerState<_GitHubConnectDialog> {
   Future<void> _start() async {
     final controller = ref.read(githubSessionProvider.notifier);
     try {
+      if (ref.read(cloudAuthProvider) != null) {
+        setState(() => _browser = true);
+        await controller.signInViaCloud(cancelled: _cancel.future);
+        if (mounted) Navigator.pop(context, true);
+        return;
+      }
       final code = await controller.startConnect();
       if (!mounted) return;
       setState(() => _code = code);
@@ -83,6 +93,27 @@ class _GitHubConnectDialogState extends ConsumerState<_GitHubConnectDialog> {
             ? Text(
                 _error!,
                 style: TextStyle(color: colors.danger, fontSize: 13),
+              )
+            : _browser
+            ? Row(
+                children: [
+                  const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 1.8),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Complete sign-in in your browser. Vesper continues '
+                      'automatically.',
+                      style: TextStyle(
+                        color: colors.textSecondary,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                ],
               )
             : code == null
             ? const SizedBox(

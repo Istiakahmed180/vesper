@@ -111,6 +111,23 @@ class GitHubAuthRepository {
     return session;
   }
 
+  /// Stores a session for [token] obtained by another sign-in flow (GitHub
+  /// sign-in through cloud sync).
+  Future<GitHubSession> completeWithToken(
+    String token, {
+    required String scopes,
+  }) async {
+    final account = await api.currentUser(token);
+    final session = GitHubSession(
+      accessToken: token,
+      account: account,
+      scopes: scopes,
+    );
+    await _store(session);
+    logger.info('GitHub account connected', {'login': account.login});
+    return session;
+  }
+
   Future<void> _store(GitHubSession session) =>
       vault.write(VaultKeys.githubSession, jsonEncode(session.toJson()));
 

@@ -1,10 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/di/app_providers.dart';
 import '../../../core/errors/app_failure.dart';
 import '../../auth/presentation/auth_providers.dart';
+import '../../cloud_sync/presentation/cloud_providers.dart';
 import '../../settings/data/settings_repository.dart';
 import '../../workspaces/presentation/workspace_providers.dart';
 import '../data/github_api.dart';
@@ -37,7 +39,12 @@ class GitHubController extends AsyncNotifier<GitHubSession?> {
       ref.watch(githubAuthRepositoryProvider).restore();
 
   Future<DeviceCode> startConnect() async {
-    // Only one account at a time.
+    await _ensureNoGoogleSession();
+    return _repo.startDeviceFlow();
+  }
+
+  /// Only one account at a time.
+  Future<void> _ensureNoGoogleSession() async {
     final google = await ref.read(authSessionProvider.future);
     if (google != null) {
       throw ValidationFailure(
@@ -45,7 +52,28 @@ class GitHubController extends AsyncNotifier<GitHubSession?> {
         'Sign out first to connect GitHub.',
       );
     }
-    return _repo.startDeviceFlow();
+  }
+
+  /// Signs in with GitHub through cloud sync (browser + Supabase), which also
+  /// turns on cloud sync. Used whenever the build has a cloud project.
+  Future<void> signInViaCloud({Future<void>? cancelled}) async {
+    final auth = ref.read(cloudAuthProvider);
+    if (auth == null) {
+      throw const AuthFailure(
+        AuthFailureKind.notConfigured,
+        'Cloud sync is not configured in this build.',
+      );
+    }
+    await _ensureNoGoogleSession();
+    final scopes = ref.read(appConfigProvider).githubScopes;
+    final result = await auth.signInWithGitHub(
+      openUrl: (url) => launchUrl(url, mode: LaunchMode.externalApplication),
+      scopes: scopes,
+      cancelled: cancelled,
+    );
+    state = AsyncData(
+      await _repo.completeWithToken(result.githubToken, scopes: scopes),
+    );
   }
 
   Future<void> completeConnect(

@@ -9,11 +9,14 @@ import '../../../core/errors/app_failure.dart';
 import '../../../core/storage/app_database.dart';
 import '../../auth/domain/auth_models.dart';
 import '../../auth/presentation/auth_providers.dart';
+import '../../github/domain/github_models.dart';
+import '../../github/presentation/github_providers.dart';
 import '../../workspace/presentation/workspace_controller.dart';
 import '../../workspaces/presentation/workspace_providers.dart';
 import '../data/drift_local_sync_store.dart';
 import '../data/supabase_cloud.dart';
 import '../domain/sync_engine.dart';
+import 'cloud_providers.dart';
 
 enum CloudSyncPhase {
   /// Cloud sync is not configured in this build.
@@ -65,14 +68,6 @@ class CloudSyncState {
       );
 }
 
-final cloudClientProvider = Provider<SupabaseClient?>((ref) {
-  final config = ref.watch(appConfigProvider);
-  if (!config.isCloudConfigured) return null;
-  final client = SupabaseClient(config.supabaseUrl, config.supabaseAnonKey);
-  ref.onDispose(client.dispose);
-  return client;
-});
-
 final cloudSyncProvider = NotifierProvider<CloudSyncController, CloudSyncState>(
   CloudSyncController.new,
 );
@@ -103,42 +98,60 @@ class CloudSyncController extends Notifier<CloudSyncState> {
   @override
   CloudSyncState build() {
     final client = ref.watch(cloudClientProvider);
+    final auth = ref.watch(cloudAuthProvider);
     ref.onDispose(_stop);
-    if (client == null) return const CloudSyncState(CloudSyncPhase.unavailable);
-    _auth = CloudAuth(
-      client: client,
-      vault: ref.watch(vaultProvider),
-      logger: ref.watch(loggerProvider),
-    );
+    if (client == null || auth == null) {
+      return const CloudSyncState(CloudSyncPhase.unavailable);
+    }
+    _auth = auth;
     _store = SupabaseCloudStore(client);
     _local = DriftLocalSyncStore(
       ref.watch(databaseProvider),
       ref.watch(vaultProvider),
     );
     _engine = SyncEngine(local: _local!, cloud: _store!);
-    ref.listen(
-      authSessionProvider,
-      (_, next) => unawaited(_onAccount(next.value)),
-      fireImmediately: true,
+    void onAccountChange() => unawaited(
+      _onAccount(
+        ref.read(authSessionProvider).value,
+        ref.read(githubSessionProvider).value,
+      ),
     );
+    ref
+      ..listen(authSessionProvider, (_, _) => onAccountChange())
+      ..listen(githubSessionProvider, (_, _) => onAccountChange());
+    Future.microtask(onAccountChange);
     return const CloudSyncState(CloudSyncPhase.signedOut);
   }
 
-  Future<void> _onAccount(AuthSession? session) async {
-    if (session == null) {
+  /// Google or GitHub, one at a time; cloud sync follows whichever is used.
+  Future<void> _onAccount(AuthSession? google, GitHubSession? github) async {
+    final identity = google != null
+        ? 'google:${google.account.email}'
+        : github != null
+        ? 'github:${github.account.login}'
+        : null;
+    if (identity == null) {
       if (_connectedAs != null) await _disconnect();
       return;
     }
-    if (_connectedAs == session.account.email) return;
-    await _connect(session);
+    if (_connectedAs == identity) return;
+    await _connect(identity, viaGoogle: google != null);
   }
 
-  Future<void> _connect(AuthSession session) async {
+  Future<void> _connect(String identity, {required bool viaGoogle}) async {
     final generation = ++_generation;
-    _connectedAs = session.account.email;
+    _connectedAs = identity;
     state = const CloudSyncState(CloudSyncPhase.connecting);
     try {
-      final user = await _auth!.restore() ?? await _signIn();
+      final user =
+          _auth!.currentUser ??
+          await _auth!.restore() ??
+          (viaGoogle
+              ? await _signIn()
+              : throw const SyncFailure(
+                  'Cloud sync needs a new GitHub sign-in. Sign out of GitHub '
+                  'and sign in again.',
+                ));
       if (generation != _generation) return;
       final settings = ref.read(settingsRepositoryProvider);
       final owner = await settings.read(ownerIdKey);
@@ -191,7 +204,10 @@ class CloudSyncController extends Notifier<CloudSyncState> {
       ref.invalidate(workspaceProvider);
     }
     await settings.write(ownerIdKey, user.id);
-    await settings.write(ownerEmailKey, user.email ?? _connectedAs ?? '');
+    await settings.write(
+      ownerEmailKey,
+      user.email ?? _connectedAs?.split(':').last ?? '',
+    );
   }
 
   /// Resolves [CloudSyncPhase.accountChanged].

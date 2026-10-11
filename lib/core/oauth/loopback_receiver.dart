@@ -22,9 +22,11 @@ class LoopbackReceiver {
 
   String get redirectUri => 'http://127.0.0.1:${_server.port}$callbackPath';
 
-  /// Waits for the redirect and returns its query parameters.
+  /// Waits for the redirect and returns its query parameters. A null
+  /// [expectedState] skips the state check (the authorization server verifies
+  /// it itself, as in Supabase's PKCE flow).
   Future<Map<String, String>> waitForCallback({
-    required String expectedState,
+    required String? expectedState,
     Duration timeout = const Duration(minutes: 5),
     Future<void>? cancelled,
   }) async {
@@ -37,17 +39,15 @@ class LoopbackReceiver {
         return;
       }
       final params = request.uri.queryParameters;
-      final ok =
-          params['state'] == expectedState &&
-          params['error'] == null &&
-          params['code'] != null;
+      final stateOk = expectedState == null || params['state'] == expectedState;
+      final ok = stateOk && params['error'] == null && params['code'] != null;
       request.response
         ..statusCode = HttpStatus.ok
         ..headers.contentType = ContentType.html
         ..write(_page(ok));
       await request.response.close();
       if (completer.isCompleted) return;
-      if (params['state'] != expectedState) {
+      if (!stateOk) {
         completer.completeError(
           const AuthFailure(
             AuthFailureKind.invalidResponse,
