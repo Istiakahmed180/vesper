@@ -8,6 +8,7 @@ import '../../../core/utils/platform_keys.dart';
 import '../../../shared/widgets/method_badge.dart';
 import '../../collections/presentation/collection_providers.dart';
 import '../../environments/presentation/environment_providers.dart';
+import '../../environments/presentation/environment_quick_look.dart';
 import '../../environments/presentation/environments_panel.dart';
 import '../domain/workspace_models.dart';
 import 'response_controller.dart';
@@ -67,7 +68,9 @@ class TabStrip extends ConsumerWidget {
           ),
           const SizedBox(width: 8),
           const EnvironmentSelector(),
-          const SizedBox(width: 10),
+          const SizedBox(width: 2),
+          const EnvironmentQuickLook(),
+          const SizedBox(width: 6),
         ],
       ),
     );
