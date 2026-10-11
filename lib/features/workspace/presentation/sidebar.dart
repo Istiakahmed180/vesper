@@ -4,13 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/platform_keys.dart';
-import '../../auth/presentation/account_card.dart';
-import '../../auth/presentation/auth_providers.dart';
+import '../../auth/presentation/account_menu.dart';
 import '../../collections/presentation/collection_providers.dart';
 import '../../collections/presentation/collection_tree_view.dart';
 import '../../environments/presentation/environments_panel.dart';
 import '../../history/presentation/history_panel.dart';
 import '../../import_export/presentation/import_export_actions.dart';
+import '../../settings/presentation/settings_view.dart';
 import '../../sync/presentation/sync_dialog.dart';
 import '../../workspaces/presentation/workspace_switcher.dart';
 import 'app_commands.dart';
@@ -24,7 +24,6 @@ class ActivityRail extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final colors = context.colors;
     final shell = ref.watch(shellProvider);
-    final session = ref.watch(authSessionProvider).value;
 
     Widget item(
       ShellSection s,
@@ -67,9 +66,7 @@ class ActivityRail extends ConsumerWidget {
       ),
       child: Column(
         children: [
-          const SizedBox(height: 10),
-          const _Logo(),
-          const SizedBox(height: 14),
+          const SizedBox(height: 6),
           item(
             ShellSection.collections,
             Icons.folder_copy_outlined,
@@ -84,28 +81,13 @@ class ActivityRail extends ConsumerWidget {
           ),
           item(ShellSection.history, Icons.history, Icons.history, 'History'),
           const Spacer(),
-          Tooltip(
-            message: session == null ? 'Account' : session.account.email,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(20),
-              onTap: () => ref
-                  .read(shellProvider.notifier)
-                  .select(ShellSection.settings),
-              child: Padding(
-                padding: const EdgeInsets.all(6),
-                child: session == null
-                    ? Icon(
-                        Icons.account_circle_outlined,
-                        size: 22,
-                        color: colors.textSecondary,
-                      )
-                    : Avatar(
-                        initials: session.account.initials,
-                        url: session.account.pictureUrl,
-                        size: 26,
-                      ),
-              ),
-            ),
+          AccountMenuButton(
+            onOpenSettings: () {
+              ref
+                  .read(settingsPageProvider.notifier)
+                  .show(SettingsPage.accounts);
+              ref.read(shellProvider.notifier).openSettings();
+            },
           ),
           item(
             ShellSection.settings,
@@ -116,28 +98,6 @@ class ActivityRail extends ConsumerWidget {
           const SizedBox(height: 8),
         ],
       ),
-    );
-  }
-}
-
-class _Logo extends StatelessWidget {
-  const _Logo();
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    return Container(
-      width: 30,
-      height: 30,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [colors.accent, colors.info],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: const Icon(Icons.auto_awesome, size: 16, color: Colors.white),
     );
   }
 }

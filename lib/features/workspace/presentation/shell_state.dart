@@ -51,6 +51,9 @@ class ShellController extends Notifier<ShellState> {
     }
   }
 
+  /// Shows Settings without toggling it closed when it is already open.
+  void openSettings() => state = state.copyWith(section: ShellSection.settings);
+
   void showSection(ShellSection section) =>
       state = state.copyWith(section: section, sidebarVisible: true);
 

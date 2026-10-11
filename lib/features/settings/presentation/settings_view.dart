@@ -22,16 +22,30 @@ import '../../workspaces/presentation/workspace_providers.dart';
 import '../domain/app_settings.dart';
 import 'settings_controller.dart';
 
-enum _Section {
+enum SettingsPage {
   general('General', Icons.tune),
   network('Network', Icons.lan_outlined),
   security('Security', Icons.shield_outlined),
-  account('Accounts', Icons.person_outline),
+  accounts('Accounts', Icons.person_outline),
   data('Data', Icons.storage_outlined);
 
-  const _Section(this.label, this.icon);
+  const SettingsPage(this.label, this.icon);
   final String label;
   final IconData icon;
+}
+
+/// The page shown in Settings; kept while Settings is closed so other parts
+/// of the app (e.g. the account menu) can open a specific page.
+final settingsPageProvider =
+    NotifierProvider<SettingsPageController, SettingsPage>(
+      SettingsPageController.new,
+    );
+
+class SettingsPageController extends Notifier<SettingsPage> {
+  @override
+  SettingsPage build() => SettingsPage.general;
+
+  void show(SettingsPage page) => state = page;
 }
 
 class SettingsView extends ConsumerStatefulWidget {
@@ -42,11 +56,10 @@ class SettingsView extends ConsumerStatefulWidget {
 }
 
 class _SettingsViewState extends ConsumerState<SettingsView> {
-  _Section _section = _Section.general;
-
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    final page = ref.watch(settingsPageProvider);
     return ColoredBox(
       color: colors.panel,
       child: Row(
@@ -68,12 +81,13 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ),
-                for (final s in _Section.values)
+                for (final s in SettingsPage.values)
                   _NavItem(
                     icon: s.icon,
                     label: s.label,
-                    selected: s == _section,
-                    onTap: () => setState(() => _section = s),
+                    selected: s == page,
+                    onTap: () =>
+                        ref.read(settingsPageProvider.notifier).show(s),
                   ),
               ],
             ),
@@ -84,12 +98,12 @@ class _SettingsViewState extends ConsumerState<SettingsView> {
               children: [
                 ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 760),
-                  child: switch (_section) {
-                    _Section.general => const _GeneralSettings(),
-                    _Section.network => const _NetworkSettings(),
-                    _Section.security => const _SecuritySettings(),
-                    _Section.account => const _AccountSettings(),
-                    _Section.data => const _DataSettings(),
+                  child: switch (page) {
+                    SettingsPage.general => const _GeneralSettings(),
+                    SettingsPage.network => const _NetworkSettings(),
+                    SettingsPage.security => const _SecuritySettings(),
+                    SettingsPage.accounts => const _AccountSettings(),
+                    SettingsPage.data => const _DataSettings(),
                   },
                 ),
               ],
