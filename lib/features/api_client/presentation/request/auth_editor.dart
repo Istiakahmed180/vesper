@@ -105,7 +105,7 @@ class AuthForm extends ConsumerWidget {
                 ),
               ),
               const _Hint(
-                'Sent as "Authorization: Bearer <token>". Stored in the system keychain.',
+                'Sent as "Authorization: Bearer <token>". Stored encrypted on this computer, never in the database.',
               ),
             ],
           ),
@@ -126,7 +126,7 @@ class AuthForm extends ConsumerWidget {
                 ),
               ),
               const _Hint(
-                'Credentials are Base64 encoded into the Authorization header. The password is stored in the system keychain.',
+                'Credentials are Base64 encoded into the Authorization header. The password is stored encrypted on this computer.',
               ),
             ],
           ),
