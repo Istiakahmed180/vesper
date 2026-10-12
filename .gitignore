@@ -62,3 +62,6 @@ client_secret*.json
 
 # Packaged installers
 /dist/
+
+# Claude Code
+/CLAUDE.md
