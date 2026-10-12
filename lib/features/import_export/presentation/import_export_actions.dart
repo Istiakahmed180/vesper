@@ -10,6 +10,7 @@ import '../../../core/errors/app_failure.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../shared/widgets/dialogs.dart';
+import '../../collections/domain/collection_repository.dart';
 import '../../collections/presentation/collection_providers.dart';
 import '../../environments/domain/environment_models.dart';
 import '../domain/collection_codec.dart';
@@ -50,7 +51,11 @@ class ImportExportActions {
           .importCollection(result.value);
       ref.read(expandedNodesProvider.notifier).expand([id]);
       if (!context.mounted) return;
-      showToast(context, 'Imported "${result.value.name}" (${result.source})');
+      showToast(
+        context,
+        'Imported "${result.value.name}": ${_counts(result.value.items)} '
+        '(${result.source})',
+      );
       if (result.warnings.isNotEmpty) await _showWarnings(result.warnings);
     } catch (e) {
       if (context.mounted) showToast(context, e.userMessage, error: true);
@@ -75,7 +80,7 @@ class ImportExportActions {
       if (!context.mounted) return;
       showToast(
         context,
-        'Imported "${result.value.name}" into "$collectionName" '
+        'Imported ${_counts(result.value.items)} into "$collectionName" '
         '(${result.source})',
       );
       final warnings = [
@@ -88,6 +93,26 @@ class ImportExportActions {
     } catch (e) {
       if (context.mounted) showToast(context, e.userMessage, error: true);
     }
+  }
+
+  /// "12 requests, 3 folders" for the items of an imported collection.
+  static String _counts(List<CollectionItem> items) {
+    var requests = 0;
+    var folders = 0;
+    void walk(List<CollectionItem> list) {
+      for (final i in list) {
+        switch (i) {
+          case FolderItem(:final items):
+            folders++;
+            walk(items);
+          case RequestItem():
+            requests++;
+        }
+      }
+    }
+
+    walk(items);
+    return '$requests request(s), $folders folder(s)';
   }
 
   Future<void> importEnvironment({String? fromText}) async {

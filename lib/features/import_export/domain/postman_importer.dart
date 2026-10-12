@@ -79,7 +79,8 @@ class PostmanCollectionImporter implements CollectionImporter {
     final docItems = items(json.objList('item'), 1, null);
     if (scripts > 0) {
       warnings.add(
-        '$scripts script(s) were ignored; Vesper never runs imported scripts.',
+        '$scripts script(s) were left out because Vesper never runs imported '
+        'scripts. The requests and folders that had them were imported.',
       );
     }
     final collectionAuth = json['auth'] is Map
