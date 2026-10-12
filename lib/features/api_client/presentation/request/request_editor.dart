@@ -21,6 +21,7 @@ import 'auth_editor.dart';
 import 'body_editor.dart';
 import 'cookies_view.dart';
 import 'default_headers.dart';
+import 'extractions_editor.dart';
 import 'request_options_view.dart';
 import 'url_bar.dart';
 
@@ -76,6 +77,12 @@ class RequestEditor extends ConsumerWidget {
       requestTabProvider(
         tabId,
       ).select((t) => t?.draft.headers.where((h) => h.isActive).length ?? 0),
+    );
+    final extractionCount = ref.watch(
+      requestTabProvider(tabId).select(
+        (t) =>
+            t?.draft.options.extractions.where((e) => e.isActive).length ?? 0,
+      ),
     );
     final hasAuth = ref.watch(
       requestTabProvider(
@@ -134,6 +141,10 @@ class RequestEditor extends ConsumerWidget {
                 badge: headerCount == 0 ? null : '$headerCount',
               ),
               SectionTab('Body', dot: hasBody),
+              SectionTab(
+                'Set variables',
+                badge: extractionCount == 0 ? null : '$extractionCount',
+              ),
               const SectionTab('Cookies'),
               const SectionTab('Settings'),
             ],
@@ -146,7 +157,8 @@ class RequestEditor extends ConsumerWidget {
               1 => AuthEditor(tabId: tabId),
               2 => _HeadersSection(tabId: tabId),
               3 => BodyEditor(tabId: tabId),
-              4 => CookiesView(tabId: tabId),
+              4 => ExtractionsEditor(tabId: tabId),
+              5 => CookiesView(tabId: tabId),
               _ => RequestOptionsView(tabId: tabId),
             },
           ),

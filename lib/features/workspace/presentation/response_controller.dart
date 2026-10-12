@@ -4,12 +4,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/di/app_providers.dart';
 import '../../../core/errors/app_failure.dart';
 import '../../../core/network/cancel_handle.dart';
+import '../../api_client/domain/models/api_request.dart';
 import '../../api_client/domain/models/api_response.dart';
 import '../../api_client/domain/usecases/send_request.dart';
 import '../../collections/presentation/collection_providers.dart';
 import '../../environments/presentation/environment_providers.dart';
 import '../../settings/presentation/settings_controller.dart';
 import '../domain/workspace_models.dart';
+import 'variable_updater.dart';
 import 'workspace_controller.dart';
 
 @immutable
@@ -28,8 +30,11 @@ class ResponseLoading extends ResponseState {
 }
 
 class ResponseSuccess extends ResponseState {
-  const ResponseSuccess(this.response);
+  const ResponseSuccess(this.response, {this.notes = const []});
   final ApiResponse response;
+
+  /// Results of the request's "Set variables" rules.
+  final List<ExtractionNote> notes;
 }
 
 class ResponseFailure extends ResponseState {
@@ -85,6 +90,10 @@ class ResponseController extends Notifier<ResponseState> {
       if (generation == _generation && ref.mounted) {
         state = ResponseSuccess(response);
       }
+      final notes = await _setVariables(tab.draft, response);
+      if (notes.isNotEmpty && generation == _generation && ref.mounted) {
+        state = ResponseSuccess(response, notes: notes);
+      }
     } on AppFailure catch (failure) {
       if (generation == _generation && ref.mounted) {
         state = ResponseFailure(failure);
@@ -96,6 +105,22 @@ class ResponseController extends Notifier<ResponseState> {
       if (generation == _generation && ref.mounted) {
         state = const ResponseFailure(UnexpectedFailure());
       }
+    }
+  }
+
+  Future<List<ExtractionNote>> _setVariables(
+    ApiRequest request,
+    ApiResponse response,
+  ) async {
+    try {
+      return await applyExtractions(ref, request, response);
+    } catch (e) {
+      return [
+        ExtractionNote(
+          'Variables could not be updated: ${e.userMessage}',
+          ok: false,
+        ),
+      ];
     }
   }
 
