@@ -7,6 +7,7 @@ import 'http_method.dart';
 import 'key_value.dart';
 import 'request_auth.dart';
 import 'request_body.dart';
+import 'variable_extraction.dart';
 
 /// Per-request overrides of the global network settings.
 @immutable
@@ -15,6 +16,7 @@ class RequestOptions {
     this.timeoutMs,
     this.followRedirects,
     this.disabledDefaultHeaders = const {},
+    this.extractions = const [],
   });
 
   /// null → use the global setting.
@@ -25,19 +27,27 @@ class RequestOptions {
   /// that are not added automatically.
   final Set<String> disabledDefaultHeaders;
 
-  RequestOptions copyWith({Set<String>? disabledDefaultHeaders}) =>
-      RequestOptions(
-        timeoutMs: timeoutMs,
-        followRedirects: followRedirects,
-        disabledDefaultHeaders:
-            disabledDefaultHeaders ?? this.disabledDefaultHeaders,
-      );
+  /// Variables set from a successful response (no-code post-response step).
+  final List<VariableExtraction> extractions;
+
+  RequestOptions copyWith({
+    Set<String>? disabledDefaultHeaders,
+    List<VariableExtraction>? extractions,
+  }) => RequestOptions(
+    timeoutMs: timeoutMs,
+    followRedirects: followRedirects,
+    disabledDefaultHeaders:
+        disabledDefaultHeaders ?? this.disabledDefaultHeaders,
+    extractions: extractions ?? this.extractions,
+  );
 
   JsonMap toJson() => {
     if (timeoutMs != null) 'timeoutMs': timeoutMs,
     if (followRedirects != null) 'followRedirects': followRedirects,
     if (disabledDefaultHeaders.isNotEmpty)
       'disabledDefaultHeaders': disabledDefaultHeaders.toList()..sort(),
+    if (extractions.isNotEmpty)
+      'extractions': [for (final e in extractions) e.toJson()],
   };
 
   factory RequestOptions.fromJson(JsonMap json) => RequestOptions(
@@ -49,22 +59,29 @@ class RequestOptions {
       for (final v in json.list('disabledDefaultHeaders'))
         if (v is String) v.toLowerCase(),
     },
+    extractions: [
+      for (final e in json.objList('extractions'))
+        VariableExtraction.fromJson(e),
+    ],
   );
 
   static const _setEq = SetEquality<String>();
+  static const _listEq = ListEquality<VariableExtraction>();
 
   @override
   bool operator ==(Object other) =>
       other is RequestOptions &&
       other.timeoutMs == timeoutMs &&
       other.followRedirects == followRedirects &&
-      _setEq.equals(other.disabledDefaultHeaders, disabledDefaultHeaders);
+      _setEq.equals(other.disabledDefaultHeaders, disabledDefaultHeaders) &&
+      _listEq.equals(other.extractions, extractions);
 
   @override
   int get hashCode => Object.hash(
     timeoutMs,
     followRedirects,
     _setEq.hash(disabledDefaultHeaders),
+    _listEq.hash(extractions),
   );
 }
 

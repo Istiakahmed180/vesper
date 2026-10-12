@@ -18,6 +18,7 @@ import '../../../../shared/widgets/code/code_view.dart';
 import '../../../../shared/widgets/dialogs.dart';
 import '../../../../shared/widgets/section_tabs.dart';
 import '../../../workspace/presentation/response_controller.dart';
+import '../../../workspace/presentation/variable_updater.dart';
 import '../../domain/models/api_response.dart';
 import 'body_formatter.dart';
 
@@ -43,9 +44,17 @@ class ResponsePanel extends ConsumerWidget {
           onCancel: () => ref.read(responseProvider(tabId).notifier).cancel(),
         ),
         ResponseFailure(:final failure) => _FailureView(failure: failure),
-        ResponseSuccess(:final response) => _ResponseView(
-          key: ObjectKey(response),
-          response: response,
+        ResponseSuccess(:final response, :final notes) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (notes.isNotEmpty) _ExtractionNotes(notes: notes),
+            Expanded(
+              child: _ResponseView(
+                key: ObjectKey(response),
+                response: response,
+              ),
+            ),
+          ],
         ),
       },
     );
@@ -755,4 +764,45 @@ class _DetailsView extends StatelessWidget {
           ('Redirect ${i + 1}', response.redirects[i]),
     ],
   );
+}
+
+/// Results of the request's "Set variables" rules, above the response.
+class _ExtractionNotes extends StatelessWidget {
+  const _ExtractionNotes({required this.notes});
+  final List<ExtractionNote> notes;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Container(
+      key: const ValueKey('extraction-notes'),
+      padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
+      decoration: BoxDecoration(
+        color: colors.panelRaised,
+        border: Border(bottom: BorderSide(color: colors.border)),
+      ),
+      child: Wrap(
+        spacing: 16,
+        runSpacing: 4,
+        children: [
+          for (final note in notes)
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  note.ok ? Icons.check_circle_outline : Icons.error_outline,
+                  size: 14,
+                  color: note.ok ? colors.success : colors.warning,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  note.message,
+                  style: TextStyle(fontSize: 12, color: colors.textSecondary),
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
 }

@@ -9,6 +9,7 @@ It's a Postman alternative with its own design, code and assets. It can import P
 | Area | What you get |
 | --- | --- |
 | Requests | GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS · query params synced with the URL · cancel · per-request timeout and redirect overrides |
+| Set variables | No-code post-response step: after a 2xx response, copy a JSON path (`token`, `data.items[0].id`) or a response header into the active environment, the collection or the Globals — e.g. keep a login token up to date. Shows the value the last response would give |
 | Headers | Default headers (Host, User-Agent, Accept, Accept-Encoding, Connection, Content-Type, Content-Length) listed in the Headers tab, each switchable or overridable · autocomplete for ~50 common header names and their typical values · bulk edit |
 | Tables | Params, headers, form-data and URL-encoded fields: per-row and "all rows" enable/disable, Clear, bulk edit, `{{variable}}` autocomplete |
 | Bodies | None, JSON (highlighting, validation, Beautify), Raw (Text/JSON/XML/HTML/JS), form-data with multipart file upload, x-www-form-urlencoded, binary file (drag & drop) |
