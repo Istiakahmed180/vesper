@@ -156,10 +156,18 @@ class CodeViewController extends ChangeNotifier {
 /// Virtualised, read-only code viewer with line numbers, folding, syntax
 /// highlighting and search highlights. Only visible rows are built.
 class CodeView extends StatefulWidget {
-  const CodeView({super.key, required this.controller, this.fontSize = 12.5});
+  const CodeView({
+    super.key,
+    required this.controller,
+    this.fontSize = 12.5,
+    this.extraMenuItems,
+  });
 
   final CodeViewController controller;
   final double fontSize;
+
+  /// Extra right-click entries for the selected text, after Copy etc.
+  final List<ContextMenuButtonItem> Function(String selection)? extraMenuItems;
 
   @override
   State<CodeView> createState() => _CodeViewState();
@@ -168,6 +176,7 @@ class CodeView extends StatefulWidget {
 class _CodeViewState extends State<CodeView> {
   final _vertical = ScrollController();
   final _horizontal = ScrollController();
+  String _selection = '';
 
   double get _lineHeight => (widget.fontSize * 1.6).roundToDouble();
 
@@ -246,6 +255,16 @@ class _CodeViewState extends State<CodeView> {
                   child: Scrollbar(
                     controller: _vertical,
                     child: SelectionArea(
+                      onSelectionChanged: (c) =>
+                          _selection = c?.plainText ?? '',
+                      contextMenuBuilder: (_, state) =>
+                          AdaptiveTextSelectionToolbar.buttonItems(
+                            anchors: state.contextMenuAnchors,
+                            buttonItems: [
+                              ...state.contextMenuButtonItems,
+                              ...?widget.extraMenuItems?.call(_selection),
+                            ],
+                          ),
                       child: ListView.builder(
                         controller: _vertical,
                         itemExtent: _lineHeight,
