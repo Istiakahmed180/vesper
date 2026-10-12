@@ -51,7 +51,9 @@ void main() {
 
     await tester.tap(find.text('What\'s new').first);
     await tester.pumpAndSettle();
-    expect(find.text('* Faster requests'), findsOneWidget);
+    // Notes are Markdown: the list marker becomes a bullet.
+    expect(find.text('Faster requests'), findsOneWidget);
+    expect(find.text('* Faster requests'), findsNothing);
     await tester.tap(find.text('Close'));
     await tester.pumpAndSettle();
 
