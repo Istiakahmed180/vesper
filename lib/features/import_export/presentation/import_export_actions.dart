@@ -57,6 +57,39 @@ class ImportExportActions {
     }
   }
 
+  /// Imports a collection file and appends its folders and requests to the
+  /// existing collection [collectionId].
+  Future<void> importIntoCollection(
+    String collectionId,
+    String collectionName,
+  ) async {
+    try {
+      final text = await _pickJson('Import into "$collectionName"');
+      if (text == null) return;
+      final service = ref.read(importServiceProvider);
+      final result = service.parseCollection(await ImportService.decode(text));
+      await ref
+          .read(collectionRepositoryProvider)
+          .importIntoCollection(collectionId, result.value);
+      ref.read(expandedNodesProvider.notifier).expand([collectionId]);
+      if (!context.mounted) return;
+      showToast(
+        context,
+        'Imported "${result.value.name}" into "$collectionName" '
+        '(${result.source})',
+      );
+      final warnings = [
+        ...result.warnings,
+        if (!result.value.settings.isEmpty)
+          'Collection authorization and variables from the file were not '
+              'imported; "$collectionName" keeps its own.',
+      ];
+      if (warnings.isNotEmpty) await _showWarnings(warnings);
+    } catch (e) {
+      if (context.mounted) showToast(context, e.userMessage, error: true);
+    }
+  }
+
   Future<void> importEnvironment({String? fromText}) async {
     try {
       final text = fromText ?? await _pickJson('Import environment');
