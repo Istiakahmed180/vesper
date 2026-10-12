@@ -56,6 +56,11 @@ jobs:
             echo "SUPABASE_URL=${SUPABASE_URL}"
             echo "SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}"
           } > .env
+          # A malformed URL builds fine but leaves cloud sync "Offline".
+          case "$SUPABASE_URL" in
+            ""|https://*) ;;
+            *) echo "::error::The SUPABASE_URL secret must start with https://"; exit 1 ;;
+          esac
 
       - run: flutter pub get
 
