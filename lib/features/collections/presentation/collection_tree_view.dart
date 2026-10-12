@@ -17,6 +17,7 @@ import '../../workspaces/presentation/workspace_providers.dart';
 import '../../workspaces/presentation/workspace_switcher.dart';
 import '../domain/collection_models.dart';
 import 'collection_providers.dart';
+import 'delete_items_dialog.dart';
 
 /// Payload carried while dragging tree nodes.
 sealed class TreeDrag {
@@ -448,6 +449,24 @@ class _CollectionRow extends ConsumerWidget {
                 child: const Text('Move to workspace'),
               ),
             const Divider(),
+            if (tree.children.isNotEmpty)
+              MenuItemButton(
+                key: const ValueKey('collection-delete-items'),
+                leadingIcon: Icon(
+                  Icons.checklist_rtl,
+                  size: 16,
+                  color: colors.danger,
+                ),
+                onPressed: () => showDeleteItemsDialog(
+                  context,
+                  collectionId: c.id,
+                  title: c.name,
+                ),
+                child: Text(
+                  'Delete items…',
+                  style: TextStyle(color: colors.danger),
+                ),
+              ),
             MenuItemButton(
               leadingIcon: Icon(
                 Icons.delete_outline,
@@ -583,6 +602,25 @@ class _FolderRow extends ConsumerWidget {
               child: const Text('Duplicate'),
             ),
             const Divider(),
+            if (node.children.isNotEmpty)
+              MenuItemButton(
+                key: const ValueKey('folder-delete-items'),
+                leadingIcon: Icon(
+                  Icons.checklist_rtl,
+                  size: 16,
+                  color: colors.danger,
+                ),
+                onPressed: () => showDeleteItemsDialog(
+                  context,
+                  collectionId: f.collectionId,
+                  folderId: f.id,
+                  title: f.name,
+                ),
+                child: Text(
+                  'Delete items…',
+                  style: TextStyle(color: colors.danger),
+                ),
+              ),
             MenuItemButton(
               leadingIcon: Icon(
                 Icons.delete_outline,
