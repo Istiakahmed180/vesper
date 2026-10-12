@@ -4,7 +4,7 @@ class AppConstants {
   static const appName = 'Vesper';
 
   /// Must match `version:` in pubspec.yaml (checked by a test).
-  static const appVersion = '0.2.0';
+  static const appVersion = '0.2.1';
   static const userAgent = 'Vesper/$appVersion';
   static const databaseName = 'vesper';
 
