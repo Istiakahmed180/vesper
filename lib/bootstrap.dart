@@ -55,12 +55,15 @@ Future<ProviderContainer> bootstrap({
 
   await windowManager.ensureInitialized();
   await windowManager.waitUntilReadyToShow(
-    const WindowOptions(
+    WindowOptions(
       title: AppConstants.appName,
-      size: Size(1440, 900),
+      size: const Size(1440, 900),
       minimumSize: minimumWindowSize,
       center: true,
-      backgroundColor: Color(0xFF15171C),
+      // On Windows the background color is applied through an accent policy
+      // (SetWindowCompositionAttribute) that paints over the native caption,
+      // hiding the title and the minimize/maximize buttons.
+      backgroundColor: Platform.isWindows ? null : const Color(0xFF15171C),
     ),
     () async {
       await windowManager.show();
