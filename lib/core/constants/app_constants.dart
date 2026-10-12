@@ -2,9 +2,14 @@ class AppConstants {
   const AppConstants._();
 
   static const appName = 'Vesper';
-  static const appVersion = '0.1.0';
+
+  /// Must match `version:` in pubspec.yaml (checked by a test).
+  static const appVersion = '0.2.0';
   static const userAgent = 'Vesper/$appVersion';
   static const databaseName = 'vesper';
+
+  /// GitHub repository whose published releases deliver app updates.
+  static const updateRepository = 'Istiakahmed180/vesper';
 
   static const defaultTimeoutMs = 30000;
   static const defaultMaxRedirects = 10;

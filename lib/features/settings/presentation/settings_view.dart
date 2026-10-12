@@ -18,6 +18,7 @@ import '../../github/presentation/github_card.dart';
 import '../../history/presentation/history_panel.dart';
 import '../../history/presentation/history_providers.dart';
 import '../../import_export/presentation/import_export_actions.dart';
+import '../../updates/presentation/update_widgets.dart';
 import '../../workspace/presentation/workspace_controller.dart';
 import '../../workspaces/presentation/workspace_providers.dart';
 import '../domain/app_settings.dart';
@@ -339,6 +340,24 @@ class _GeneralSettings extends ConsumerWidget {
                 selected: {s.themeMode},
                 onSelectionChanged: (v) =>
                     c.update((x) => x.copyWith(themeMode: v.first)),
+              ),
+            ),
+          ],
+        ),
+        _Group(
+          title: 'Updates',
+          description:
+              'New versions are published on GitHub. Your data and settings '
+              'are kept when you update.',
+          children: [
+            const UpdateSettingsStatus(),
+            _Setting(
+              title: 'Check for updates automatically',
+              subtitle: 'Shows a message at the top when a new version is out.',
+              trailing: Switch(
+                key: const ValueKey('auto-update-switch'),
+                value: s.autoUpdate,
+                onChanged: (v) => c.update((x) => x.copyWith(autoUpdate: v)),
               ),
             ),
           ],
