@@ -8,6 +8,10 @@ on:
         description: Run flutter analyze and flutter test before building
         type: boolean
         default: true
+      create_release:
+        description: Attach the build to a draft GitHub Release (v<version>)
+        type: boolean
+        default: false
   # Also used by release.yml, which publishes the build as an update.
   workflow_call:
     inputs:
@@ -16,7 +20,8 @@ on:
         default: true
 
 permissions:
-  contents: read
+  # write is only used by the optional "Attach to draft release" step.
+  contents: write
 
 jobs:
   build:
@@ -94,3 +99,20 @@ jobs:
           name: Vesper-Setup-${{ steps.version.outputs.value }}-Windows
           path: dist/Vesper-Setup-*.exe
           if-no-files-found: error
+
+      # Never touches a published release: those are created by release.yml.
+      - name: Attach to draft release
+        if: ${{ inputs.create_release }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: v${{ steps.version.outputs.value }}
+        run: |
+          $draft = gh release view $env:TAG --json isDraft -q .isDraft 2>$null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $env:TAG --draft --title "Vesper ${{ steps.version.outputs.value }}" --notes "Vesper ${{ steps.version.outputs.value }}"
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          } elseif ($draft -ne 'true') {
+            Write-Error "$env:TAG is already published; bump the version to build a new draft."
+            exit 1
+          }
+          gh release upload $env:TAG (Get-Item dist\Vesper-Setup-*.exe).FullName --clobber
