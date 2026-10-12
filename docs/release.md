@@ -77,7 +77,7 @@ Two workflows build installers on GitHub's machines without publishing them; sta
 | `Build macOS (DMG)` | macOS 15 | `Vesper-<version>-macOS.dmg` | Open the DMG and drag Vesper onto Applications |
 | `Build Windows (Installer)` | Windows | `Vesper-Setup-<version>.exe` | Setup wizard: install location, all users or just me, optional desktop shortcut, Start Menu entry, launch at finish; uninstall from Settings → Apps |
 
-Input: **Run tests** (analyze and test first, default on). Download the result from the run page under **Artifacts**.
+Inputs: **Run tests** (analyze and test first, default on) and **Attach to draft release** (default off: uploads the installer to a draft GitHub Release `v<version>`, creating the draft if needed; fails if that version is already published). Download the result from the run page under **Artifacts**.
 
 **Repository secrets** (Settings → Secrets and variables → Actions). GitHub does not allow secret names that start with `GITHUB_`, hence `OAUTH_`:
 
