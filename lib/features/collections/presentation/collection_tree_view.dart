@@ -662,6 +662,11 @@ class _FolderRow extends ConsumerWidget {
                   style: const TextStyle(fontSize: 13),
                 ),
               ),
+              Text(
+                '${node.requestCount}',
+                style: TextStyle(fontSize: 11, color: colors.textMuted),
+              ),
+              const SizedBox(width: 6),
             ],
           ),
         ),
