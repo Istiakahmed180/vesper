@@ -28,71 +28,137 @@ class ImportExportActions {
   final BuildContext context;
 
   Future<String?> _pickJson(String title) async {
+    final file = (await _pickJsonFiles(title, multiple: false)).firstOrNull;
+    if (file?.error case final error?) throw ImportFailure(error);
+    return file?.text;
+  }
+
+  /// Picked `.json` files, read as text. A file that cannot be read becomes
+  /// an entry with [_PickedFile.error] set.
+  Future<List<_PickedFile>> _pickJsonFiles(
+    String title, {
+    bool multiple = true,
+  }) async {
     final files = await FilePicker.pickFiles(
       dialogTitle: title,
       type: FileType.custom,
       allowedExtensions: const ['json'],
     );
-    final file = files.firstOrNull;
-    if (file == null) return null;
-    final bytes = await file.xFile.length();
-    ImportLimits.checkSize(bytes);
-    return file.xFile.readAsString();
+    return [
+      for (final file in multiple ? files : files.take(1))
+        await () async {
+          try {
+            ImportLimits.checkSize(await file.xFile.length());
+            final text = await file.xFile.readAsString();
+            return _PickedFile(file.name, text: text);
+          } catch (e) {
+            return _PickedFile(file.name, error: e.userMessage);
+          }
+        }(),
+    ];
   }
 
-  Future<void> importCollection({String? fromText}) async {
-    try {
-      final text = fromText ?? await _pickJson('Import collection');
-      if (text == null) return;
-      final service = ref.read(importServiceProvider);
-      final result = service.parseCollection(await ImportService.decode(text));
-      final id = await ref
-          .read(collectionRepositoryProvider)
-          .importCollection(result.value);
-      ref.read(expandedNodesProvider.notifier).expand([id]);
-      if (!context.mounted) return;
+  /// Parses each file and hands it to [store]; one bad file does not stop
+  /// the others. Reports a summary toast and any notes.
+  Future<void> _importFiles(
+    List<_PickedFile> files,
+    Future<void> Function(CollectionDocument doc) store, {
+    required String Function(CollectionDocument doc, String counts) single,
+    required String Function(int count, String counts) many,
+    List<String> Function(CollectionDocument doc)? extraNotes,
+  }) async {
+    if (files.isEmpty) return;
+    final service = ref.read(importServiceProvider);
+    final notes = <String>[];
+    final imported = <CollectionDocument>[];
+    final failed = <String>[];
+    var sources = '';
+    for (final file in files) {
+      final label = files.length > 1 ? '${file.name}: ' : '';
+      try {
+        final text = file.text;
+        if (text == null) {
+          throw ImportFailure(file.error ?? 'The file could not be read.');
+        }
+        final json = await ImportService.decode(text);
+        final result = service.parseCollection(json);
+        await store(result.value);
+        imported.add(result.value);
+        sources = result.source;
+        final fileNotes = [
+          ...result.warnings,
+          ...?extraNotes?.call(result.value),
+        ];
+        notes.addAll([for (final w in fileNotes) '$label$w']);
+      } catch (e) {
+        failed.add('${file.name}: ${e.userMessage}');
+      }
+    }
+    if (!context.mounted) return;
+
+    final counts = _counts([for (final d in imported) ...d.items]);
+    if (imported.isEmpty) {
       showToast(
         context,
-        'Imported "${result.value.name}": ${_counts(result.value.items)} '
-        '(${result.source})',
+        failed.length == 1 ? failed.single : 'No file could be imported.',
+        error: true,
       );
-      if (result.warnings.isNotEmpty) await _showWarnings(result.warnings);
-    } catch (e) {
-      if (context.mounted) showToast(context, e.userMessage, error: true);
+    } else if (files.length == 1) {
+      showToast(context, '${single(imported.single, counts)} ($sources)');
+    } else {
+      showToast(
+        context,
+        '${many(imported.length, counts)}'
+        '${failed.isEmpty ? '' : ' · ${failed.length} failed'}',
+        error: failed.isNotEmpty,
+      );
     }
+    final all = [
+      if (imported.isNotEmpty || failed.length > 1)
+        for (final f in failed) 'Not imported: $f',
+      ...notes,
+    ];
+    if (all.isNotEmpty) await _showWarnings(all);
   }
 
-  /// Imports a collection file and appends its folders and requests to the
-  /// existing collection [collectionId].
+  /// Imports one or more collection files, each as a new collection.
+  Future<void> importCollection({String? fromText}) async {
+    final files = fromText != null
+        ? [_PickedFile('Pasted text', text: fromText)]
+        : await _pickJsonFiles('Import collections');
+    final ids = <String>[];
+    await _importFiles(
+      files,
+      (doc) async => ids.add(
+        await ref.read(collectionRepositoryProvider).importCollection(doc),
+      ),
+      single: (doc, counts) => 'Imported "${doc.name}": $counts',
+      many: (n, counts) => 'Imported $n collections: $counts',
+    );
+    if (ids.length == 1) ref.read(expandedNodesProvider.notifier).expand(ids);
+  }
+
+  /// Imports one or more collection files and appends their folders and
+  /// requests to the existing collection [collectionId].
   Future<void> importIntoCollection(
     String collectionId,
     String collectionName,
   ) async {
-    try {
-      final text = await _pickJson('Import into "$collectionName"');
-      if (text == null) return;
-      final service = ref.read(importServiceProvider);
-      final result = service.parseCollection(await ImportService.decode(text));
-      await ref
+    final files = await _pickJsonFiles('Import into "$collectionName"');
+    await _importFiles(
+      files,
+      (doc) => ref
           .read(collectionRepositoryProvider)
-          .importIntoCollection(collectionId, result.value);
-      ref.read(expandedNodesProvider.notifier).expand([collectionId]);
-      if (!context.mounted) return;
-      showToast(
-        context,
-        'Imported ${_counts(result.value.items)} into "$collectionName" '
-        '(${result.source})',
-      );
-      final warnings = [
-        ...result.warnings,
-        if (!result.value.settings.isEmpty)
+          .importIntoCollection(collectionId, doc),
+      single: (_, counts) => 'Imported $counts into "$collectionName"',
+      many: (n, counts) => 'Imported $n files into "$collectionName": $counts',
+      extraNotes: (doc) => [
+        if (!doc.settings.isEmpty)
           'Collection authorization and variables from the file were not '
               'imported; "$collectionName" keeps its own.',
-      ];
-      if (warnings.isNotEmpty) await _showWarnings(warnings);
-    } catch (e) {
-      if (context.mounted) showToast(context, e.userMessage, error: true);
-    }
+      ],
+    );
+    ref.read(expandedNodesProvider.notifier).expand([collectionId]);
   }
 
   /// "12 requests, 3 folders" for the items of an imported collection.
@@ -254,11 +320,10 @@ class ImportExportActions {
     context: context,
     builder: (context) => AlertDialog(
       title: const Text('Imported with notes'),
-      content: SizedBox(
-        width: 440,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 520, maxHeight: 420),
+        child: ListView(
+          shrinkWrap: true,
           children: [
             for (final w in warnings)
               Padding(
@@ -282,4 +347,11 @@ class ImportExportActions {
       ],
     ),
   );
+}
+
+class _PickedFile {
+  const _PickedFile(this.name, {this.text, this.error});
+  final String name;
+  final String? text;
+  final String? error;
 }
