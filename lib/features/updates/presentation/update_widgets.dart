@@ -4,8 +4,8 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/dialogs.dart';
+import '../../../shared/widgets/markdown_view.dart';
 import '../../workspace/domain/workspace_models.dart';
 import '../../workspace/presentation/workspace_controller.dart';
 import '../domain/app_release.dart';
@@ -43,12 +43,9 @@ Future<void> showReleaseNotes(BuildContext context, AppRelease release) =>
         content: SizedBox(
           width: 520,
           child: SingleChildScrollView(
-            child: SelectableText(
-              release.notes.trim().isEmpty
-                  ? 'No release notes.'
-                  : release.notes.trim(),
-              style: AppTheme.mono(context, size: 12.5),
-            ),
+            child: release.notes.trim().isEmpty
+                ? const Text('No release notes.')
+                : MarkdownView(release.notes),
           ),
         ),
         actions: [
