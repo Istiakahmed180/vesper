@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show ProviderListenable;
 
 import '../../../core/di/app_providers.dart';
 import '../../../core/security/redactor.dart';
@@ -51,68 +52,75 @@ Future<List<ExtractionNote>> applyExtractions(
     }
   }
 
-  List<EnvVariable> merge(List<EnvVariable> current, Map<String, String> set) {
-    final merged = [
-      for (final v in current)
-        set.containsKey(v.key) ? v.copyWith(value: set[v.key]) : v,
-    ];
-    for (final MapEntry(:key, :value) in set.entries) {
-      if (!current.any((v) => v.key == key)) {
-        merged.add(
-          EnvVariable(
-            key: key,
-            value: value,
-            isSecret: Redactor.isSensitiveKey(key),
-          ),
-        );
-      }
-    }
-    return merged;
-  }
-
   for (final MapEntry(key: target, value: set) in values.entries) {
-    final names = set.keys.join(', ');
-    switch (target) {
-      case ExtractionTarget.environment || ExtractionTarget.globals:
-        final env = target == ExtractionTarget.environment
-            ? ref.read(activeEnvironmentProvider)
-            : ref.read(globalsEnvironmentProvider);
-        if (env == null) {
-          notes.add(
-            ExtractionNote(
-              '$names not set: select an environment first.',
-              ok: false,
-            ),
-          );
-          continue;
-        }
-        await ref
-            .read(environmentRepositoryProvider)
-            .saveEnvironment(
-              env.copyWith(variables: merge(env.variables, set)),
-            );
-        notes.add(ExtractionNote('Set $names in ${env.name}'));
-      case ExtractionTarget.collection:
-        final collectionId = request.collectionId;
-        final repo = ref.read(collectionRepositoryProvider);
-        final settings = collectionId == null
-            ? null
-            : await repo.getSettings(collectionId);
-        if (collectionId == null || settings == null) {
-          notes.add(
-            ExtractionNote(
-              '$names not set: save the request in a collection first.',
-              ok: false,
-            ),
-          );
-          continue;
-        }
-        await repo.saveSettings(
-          collectionId,
-          settings.copyWith(variables: merge(settings.variables, set)),
-        );
-        notes.add(ExtractionNote('Set $names in the collection variables'));
-    }
+    notes.add(
+      await setVariables(ref.read, target, request.collectionId, set),
+    );
   }
   return notes;
+}
+
+/// Reads a provider; both `Ref.read` and `WidgetRef.read` fit.
+typedef ProviderRead = T Function<T>(ProviderListenable<T> provider);
+
+/// Writes [set] (name → value) into the active environment, the collection
+/// [collectionId] or the Globals, keeping other variables, and saves it.
+Future<ExtractionNote> setVariables(
+  ProviderRead read,
+  ExtractionTarget target,
+  String? collectionId,
+  Map<String, String> set,
+) async {
+  final names = set.keys.join(', ');
+  switch (target) {
+    case ExtractionTarget.environment || ExtractionTarget.globals:
+      final env = target == ExtractionTarget.environment
+          ? read(activeEnvironmentProvider)
+          : read(globalsEnvironmentProvider);
+      if (env == null) {
+        return ExtractionNote(
+          '$names not set: select an environment first.',
+          ok: false,
+        );
+      }
+      await read(
+        environmentRepositoryProvider,
+      ).saveEnvironment(env.copyWith(variables: _merge(env.variables, set)));
+      return ExtractionNote('Set $names in ${env.name}');
+    case ExtractionTarget.collection:
+      final repo = read(collectionRepositoryProvider);
+      final settings = collectionId == null
+          ? null
+          : await repo.getSettings(collectionId);
+      if (collectionId == null || settings == null) {
+        return ExtractionNote(
+          '$names not set: save the request in a collection first.',
+          ok: false,
+        );
+      }
+      await repo.saveSettings(
+        collectionId,
+        settings.copyWith(variables: _merge(settings.variables, set)),
+      );
+      return ExtractionNote('Set $names in the collection variables');
+  }
+}
+
+List<EnvVariable> _merge(List<EnvVariable> current, Map<String, String> set) {
+  final merged = [
+    for (final v in current)
+      set.containsKey(v.key) ? v.copyWith(value: set[v.key]) : v,
+  ];
+  for (final MapEntry(:key, :value) in set.entries) {
+    if (!current.any((v) => v.key == key)) {
+      merged.add(
+        EnvVariable(
+          key: key,
+          value: value,
+          isSecret: Redactor.isSensitiveKey(key),
+        ),
+      );
+    }
+  }
+  return merged;
 }

@@ -21,6 +21,7 @@ import '../../../workspace/presentation/response_controller.dart';
 import '../../../workspace/presentation/variable_updater.dart';
 import '../../domain/models/api_response.dart';
 import 'body_formatter.dart';
+import 'set_variable_dialog.dart';
 
 class ResponsePanel extends ConsumerWidget {
   const ResponsePanel({super.key, required this.tabId});
@@ -51,6 +52,7 @@ class ResponsePanel extends ConsumerWidget {
             Expanded(
               child: _ResponseView(
                 key: ObjectKey(response),
+                tabId: tabId,
                 response: response,
               ),
             ),
@@ -160,7 +162,12 @@ class _FailureView extends StatelessWidget {
 }
 
 class _ResponseView extends StatefulWidget {
-  const _ResponseView({super.key, required this.response});
+  const _ResponseView({
+    super.key,
+    required this.tabId,
+    required this.response,
+  });
+  final String tabId;
   final ApiResponse response;
 
   @override
@@ -194,10 +201,10 @@ class _ResponseViewState extends State<_ResponseView> {
           child: IndexedStack(
             index: _section,
             children: [
-              _BodyView(response: r),
-              _HeadersTable(headers: r.headers),
-              _CookiesTable(cookies: r.cookies),
-              _DetailsView(response: r),
+              _BodyView(tabId: widget.tabId, response: r),
+              _HeadersTable(tabId: widget.tabId, headers: r.headers),
+              _CookiesTable(tabId: widget.tabId, cookies: r.cookies),
+              _DetailsView(tabId: widget.tabId, response: r),
             ],
           ),
         ),
@@ -269,7 +276,8 @@ class _StatusSummary extends StatelessWidget {
 }
 
 class _BodyView extends StatefulWidget {
-  const _BodyView({required this.response});
+  const _BodyView({required this.tabId, required this.response});
+  final String tabId;
   final ApiResponse response;
 
   @override
@@ -612,7 +620,21 @@ class _BodyViewState extends State<_BodyView> {
                   style: TextStyle(fontSize: 12, color: colors.warning),
                 ),
               ),
-            Expanded(child: CodeView(controller: controller)),
+            Expanded(
+              child: Consumer(
+                builder: (context, ref, _) => CodeView(
+                  controller: controller,
+                  extraMenuItems: (selection) => [
+                    ?setVariableMenuItem(
+                      context,
+                      ref,
+                      tabId: widget.tabId,
+                      value: selection,
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ],
         );
       },
@@ -621,7 +643,8 @@ class _BodyViewState extends State<_BodyView> {
 }
 
 class _HeadersTable extends StatelessWidget {
-  const _HeadersTable({required this.headers});
+  const _HeadersTable({required this.tabId, required this.headers});
+  final String tabId;
   final List<MapEntry<String, String>> headers;
 
   @override
@@ -629,19 +652,24 @@ class _HeadersTable extends StatelessWidget {
     if (headers.isEmpty) {
       return const EmptyState(icon: Icons.list_alt, title: 'No headers');
     }
-    return _KeyValueList(rows: [for (final h in headers) (h.key, h.value)]);
+    return _KeyValueList(
+      tabId: tabId,
+      rows: [for (final h in headers) (h.key, h.value)],
+    );
   }
 }
 
 class _KeyValueList extends StatelessWidget {
-  const _KeyValueList({required this.rows});
+  const _KeyValueList({required this.tabId, required this.rows});
+  final String tabId;
   final List<(String, String)> rows;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
     final mono = AppTheme.mono(context, size: 12);
-    return SelectionArea(
+    return _VariableSelectionArea(
+      tabId: tabId,
       child: ListView.separated(
         padding: const EdgeInsets.symmetric(vertical: 4),
         itemCount: rows.length,
@@ -674,8 +702,46 @@ class _KeyValueList extends StatelessWidget {
   }
 }
 
+/// [SelectionArea] whose right-click menu can store the selection as a
+/// variable.
+class _VariableSelectionArea extends ConsumerStatefulWidget {
+  const _VariableSelectionArea({required this.tabId, required this.child});
+  final String tabId;
+  final Widget child;
+
+  @override
+  ConsumerState<_VariableSelectionArea> createState() =>
+      _VariableSelectionAreaState();
+}
+
+class _VariableSelectionAreaState
+    extends ConsumerState<_VariableSelectionArea> {
+  String _selection = '';
+
+  @override
+  Widget build(BuildContext context) => SelectionArea(
+    onSelectionChanged: (c) => _selection = c?.plainText ?? '',
+    // The menu's own context is gone once it closes, so the dialog opens
+    // from this widget's context.
+    contextMenuBuilder: (_, state) => AdaptiveTextSelectionToolbar.buttonItems(
+      anchors: state.contextMenuAnchors,
+      buttonItems: [
+        ...state.contextMenuButtonItems,
+        ?setVariableMenuItem(
+          this.context,
+          ref,
+          tabId: widget.tabId,
+          value: _selection,
+        ),
+      ],
+    ),
+    child: widget.child,
+  );
+}
+
 class _CookiesTable extends StatelessWidget {
-  const _CookiesTable({required this.cookies});
+  const _CookiesTable({required this.tabId, required this.cookies});
+  final String tabId;
   final List<ResponseCookie> cookies;
 
   @override
@@ -691,7 +757,8 @@ class _CookiesTable extends StatelessWidget {
     final style = TextStyle(fontSize: 12, color: colors.textSecondary);
     return SingleChildScrollView(
       padding: const EdgeInsets.all(12),
-      child: SelectionArea(
+      child: _VariableSelectionArea(
+        tabId: tabId,
         child: Table(
           defaultColumnWidth: const IntrinsicColumnWidth(),
           border: TableBorder(
@@ -746,11 +813,13 @@ class _CookiesTable extends StatelessWidget {
 }
 
 class _DetailsView extends StatelessWidget {
-  const _DetailsView({required this.response});
+  const _DetailsView({required this.tabId, required this.response});
+  final String tabId;
   final ApiResponse response;
 
   @override
   Widget build(BuildContext context) => _KeyValueList(
+    tabId: tabId,
     rows: [
       ('Method', response.method.value),
       ('Final URL', response.requestUrl),
