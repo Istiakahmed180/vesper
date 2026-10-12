@@ -98,6 +98,27 @@ void main() {
       ('base_url', 'https://new'),
       ('user_id', '42'),
     ]);
+
+    // Typed but not submitted: closing the panel still saves both.
+    await tester.enterText(find.widgetWithText(TextField, '42'), '43');
+    await tester.enterText(
+      find.byKey(const ValueKey('quick-new-key')).first,
+      'token_type',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('quick-new-value')).first,
+      'Bearer',
+    );
+    await tester.tap(find.byKey(const ValueKey('environment-quick-look')));
+    await settle();
+    expect(find.byKey(const ValueKey('quick-new-key')), findsNothing);
+
+    final closed = container.read(activeEnvironmentProvider)!;
+    expect(closed.variables.map((v) => (v.key, v.value)), [
+      ('base_url', 'https://new'),
+      ('user_id', '43'),
+      ('token_type', 'Bearer'),
+    ]);
     await tester.pump(const Duration(seconds: 4));
   });
 }
