@@ -26,6 +26,7 @@ It's a Postman alternative with its own design, code and assets. It can import P
 | Cloud sync | Signed in with Google, workspaces, collections, environments and history sync across computers through Supabase (offline-first, live updates, last write wins); secrets stay on each computer. Workspaces can be shared with teammates by email (owner/member roles); a notice appears when you are added to one. See [docs/cloud-sync.md](docs/cloud-sync.md) |
 | Accounts | Sign in with Google (PKCE, optional backend exchange) or GitHub (Device Flow); one account at a time, and both are optional |
 | GitHub sync | Push and pull collections as JSON files in a repository you choose, with three-way conflict detection and an explicit confirmation for every write |
+| Updates | Checks GitHub Releases in the background; a bar offers **Update & restart**, which downloads the new version, installs it in place and reopens Vesper (macOS and Windows). Settings → General → Updates shows the version and has **Check for updates**. Releasing = bump the version and push, see [docs/release.md](docs/release.md#publishing-an-update) |
 | Desktop UX | Multiple tabs (reorder, middle-click close, duplicate), native macOS menu bar, Cmd/Ctrl shortcuts, context menus, resizable panes, dark/light themes, unsaved-change prompts |
 
 ### Keyboard shortcuts (⌘ on macOS, Ctrl on Windows)

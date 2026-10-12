@@ -157,6 +157,7 @@ class AppSettings {
     this.historyEnabled = true,
     this.historyRetentionDays = AppConstants.defaultHistoryRetentionDays,
     this.historyMaxEntries = AppConstants.defaultHistoryMaxEntries,
+    this.autoUpdate = true,
   });
 
   final ThemeMode themeMode;
@@ -168,6 +169,9 @@ class AppSettings {
   final int historyRetentionDays;
   final int historyMaxEntries;
 
+  /// Check GitHub for new versions in the background.
+  final bool autoUpdate;
+
   AppSettings copyWith({
     ThemeMode? themeMode,
     StartupBehavior? startupBehavior,
@@ -175,6 +179,7 @@ class AppSettings {
     bool? historyEnabled,
     int? historyRetentionDays,
     int? historyMaxEntries,
+    bool? autoUpdate,
   }) => AppSettings(
     themeMode: themeMode ?? this.themeMode,
     startupBehavior: startupBehavior ?? this.startupBehavior,
@@ -182,6 +187,7 @@ class AppSettings {
     historyEnabled: historyEnabled ?? this.historyEnabled,
     historyRetentionDays: historyRetentionDays ?? this.historyRetentionDays,
     historyMaxEntries: historyMaxEntries ?? this.historyMaxEntries,
+    autoUpdate: autoUpdate ?? this.autoUpdate,
   );
 
   static const schemaVersion = 1;
@@ -194,6 +200,7 @@ class AppSettings {
     'historyEnabled': historyEnabled,
     'historyRetentionDays': historyRetentionDays,
     'historyMaxEntries': historyMaxEntries,
+    'autoUpdate': autoUpdate,
   };
 
   factory AppSettings.fromJson(JsonMap json) => AppSettings(
@@ -215,5 +222,6 @@ class AppSettings {
     historyMaxEntries: json
         .integer('historyMaxEntries', AppConstants.defaultHistoryMaxEntries)
         .clamp(10, 100000),
+    autoUpdate: json.boolean('autoUpdate', true),
   );
 }

@@ -18,6 +18,8 @@ import '../../environments/presentation/environment_editor.dart';
 import '../../environments/presentation/environment_providers.dart';
 import '../../github/presentation/github_providers.dart';
 import '../../settings/presentation/settings_view.dart';
+import '../../updates/presentation/update_controller.dart';
+import '../../updates/presentation/update_widgets.dart';
 import '../../workspaces/presentation/workspace_providers.dart';
 import '../domain/workspace_models.dart';
 import 'app_commands.dart';
@@ -138,6 +140,8 @@ class _AppShellState extends ConsumerState<AppShell> with WindowListener {
       );
       ref.read(joinedWorkspacesProvider.notifier).clear();
     });
+    // Starts the background update checks.
+    ref.watch(updateProvider.select((_) => null));
     final runner = CommandRunner(ref, context);
     final nativeMenus = ref.watch(nativeMenusProvider);
 
@@ -145,6 +149,7 @@ class _AppShellState extends ConsumerState<AppShell> with WindowListener {
       backgroundColor: colors.canvas,
       body: Column(
         children: [
+          const UpdateBanner(),
           Expanded(
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,

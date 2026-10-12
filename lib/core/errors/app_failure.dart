@@ -102,6 +102,13 @@ class SyncFailure extends AppFailure {
   String get title => 'Sync failed';
 }
 
+class UpdateFailure extends AppFailure {
+  const UpdateFailure(super.message, {super.debugDetail});
+
+  @override
+  String get title => 'Update failed';
+}
+
 class UnexpectedFailure extends AppFailure {
   const UnexpectedFailure([
     super.message = 'Something went wrong. Please try again.',

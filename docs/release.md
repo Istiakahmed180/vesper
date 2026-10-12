@@ -55,16 +55,29 @@ Sign `Vesper.exe` and the installer with `signtool sign /fd SHA256 /tr http://ti
 
 Runtime requirements: Windows 10 1809+ x64 and the Visual C++ Redistributable, which MSIX and most installers bundle.
 
+## Publishing an update
+
+Installed apps check `https://api.github.com/repos/Istiakahmed180/vesper/releases/latest` 20 seconds after launch and every 6 hours (Settings → General → Updates; off in debug builds). When the published version is newer, a bar at the top offers **Update & restart**:
+
+- **macOS:** downloads the DMG, copies `Vesper.app` out of it and, once Vesper has quit, swaps it in place of the running bundle (the old one is restored if the copy fails), clears the quarantine flag and reopens Vesper. If the folder is not writable, the DMG is opened instead.
+- **Windows:** downloads `Vesper-Setup-<version>.exe` and runs it with `/VERYSILENT /CLOSEAPPLICATIONS /RELAUNCH=1`; Windows asks for administrator permission once (UAC) and Vesper reopens afterwards.
+
+Data, settings and secrets live outside the app folder and are kept.
+
+**To release:** change `version:` in `pubspec.yaml` and `AppConstants.appVersion` to the same new value (a test fails if they differ), commit and push to `main`. The **Release** workflow (`.github/workflows/release.yml`) then runs the tests, builds the DMG and the installer and publishes the GitHub Release `v<version>` with notes generated from the commits. A push that does not change the version does nothing; the workflow can also be started from **Actions → Release → Run workflow**. Releases must be published (not drafts or pre-releases) to reach the apps.
+
+Versions before 0.2.0 have no updater: install 0.2.0 once by hand.
+
 ## Installers with GitHub Actions (manual)
 
-Two workflows build installers on GitHub's machines. They **never run on push**; start them from **Actions → workflow → Run workflow**.
+Two workflows build installers on GitHub's machines without publishing them; start them from **Actions → workflow → Run workflow**. The Release workflow reuses them.
 
 | Workflow | Runner | Output (artifact) | Install experience |
 | --- | --- | --- | --- |
 | `Build macOS (DMG)` | macOS 15 | `Vesper-<version>-macOS.dmg` | Open the DMG and drag Vesper onto Applications |
 | `Build Windows (Installer)` | Windows | `Vesper-Setup-<version>.exe` | Setup wizard: install location, all users or just me, optional desktop shortcut, Start Menu entry, launch at finish; uninstall from Settings → Apps |
 
-Inputs: **Run tests** (analyze and test first, default on) and **Create release** (attach the file to a draft GitHub Release `v<version>`). Download the result from the run page under **Artifacts**.
+Input: **Run tests** (analyze and test first, default on). Download the result from the run page under **Artifacts**.
 
 **Repository secrets** (Settings → Secrets and variables → Actions). GitHub does not allow secret names that start with `GITHUB_`, hence `OAUTH_`:
 
@@ -73,6 +86,8 @@ Inputs: **Run tests** (analyze and test first, default on) and **Create release*
 | `GOOGLE_CLIENT_ID` | Google Desktop client ID |
 | `GOOGLE_DESKTOP_CLIENT_SECRET` | Google Desktop client secret |
 | `OAUTH_GITHUB_CLIENT_ID` | GitHub OAuth App client ID |
+| `SUPABASE_URL` | Supabase project URL (cloud sync) |
+| `SUPABASE_ANON_KEY` | Supabase publishable key |
 
 Without them the app still builds; sign-in just shows "not configured".
 
