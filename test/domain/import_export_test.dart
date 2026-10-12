@@ -248,6 +248,51 @@ void main() {
       expect(result.warnings.any((w) => w.contains('2 script(s)')), isTrue);
     });
 
+    test('keeps requests and folders that have scripts', () {
+      final result = service.parseCollection({
+        'info': postman['info'],
+        'item': [
+          {
+            'name': 'Scripted folder',
+            'event': [
+              {
+                'listen': 'prerequest',
+                'script': {
+                  'exec': ['pm.environment.set("a", 1)'],
+                },
+              },
+            ],
+            'item': [
+              {
+                'name': 'Scripted request',
+                'event': [
+                  {
+                    'listen': 'prerequest',
+                    'script': {
+                      'exec': ['pm.variables.set("b", 2)'],
+                    },
+                  },
+                  {
+                    'listen': 'test',
+                    'script': {
+                      'exec': ['pm.test("ok", () => {})'],
+                    },
+                  },
+                ],
+                'request': {'method': 'GET', 'url': 'https://shop.dev/me'},
+              },
+            ],
+          },
+        ],
+      });
+      final folder = result.value.items.single as FolderItem;
+      expect(folder.name, 'Scripted folder');
+      final request = (folder.items.single as RequestItem).request;
+      expect(request.name, 'Scripted request');
+      expect(request.url, 'https://shop.dev/me');
+      expect(result.warnings.any((w) => w.contains('3 script(s)')), isTrue);
+    });
+
     test('imports Postman environments', () {
       final env = service.parseEnvironment({
         'name': 'Prod',
