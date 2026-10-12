@@ -7,6 +7,7 @@ import '../../core/utils/id.dart';
 import '../../features/api_client/domain/models/key_value.dart';
 import 'all_rows_checkbox.dart';
 import 'dialogs.dart';
+import 'fake_data_picker.dart';
 import 'variable_autocomplete.dart';
 import 'variable_field.dart';
 
@@ -23,6 +24,7 @@ class KeyValueEditor extends StatefulWidget {
     this.bulkSeparator = ':',
     this.keySuggestions,
     this.valueSuggestions,
+    this.fakeData = false,
   });
 
   final List<KeyValue> rows;
@@ -40,6 +42,9 @@ class KeyValueEditor extends StatefulWidget {
   /// Dropdown suggestions for a value, given its row's key.
   final List<VariableSuggestion> Function(String key, String text)?
   valueSuggestions;
+
+  /// Shows a dice button in each value cell for inserting fake data.
+  final bool fakeData;
 
   @override
   State<KeyValueEditor> createState() => _KeyValueEditorState();
@@ -185,6 +190,7 @@ class _KeyValueEditorState extends State<KeyValueEditor> {
               revealed: _revealed.contains(row.id),
               keySuggestions: widget.keySuggestions,
               valueSuggestions: widget.valueSuggestions,
+              fakeData: widget.fakeData,
               onChanged: _update,
               onRemove: () => _remove(row.id),
             ),
@@ -196,6 +202,7 @@ class _KeyValueEditorState extends State<KeyValueEditor> {
             ghost: true,
             keySuggestions: widget.keySuggestions,
             valueSuggestions: widget.valueSuggestions,
+            fakeData: widget.fakeData,
             onChanged: _update,
           ),
           Divider(color: colors.border, height: 1),
@@ -252,9 +259,11 @@ class _KeyValueRow extends StatefulWidget {
     this.revealed = false,
     this.keySuggestions,
     this.valueSuggestions,
+    this.fakeData = false,
   });
 
   final KeyValue row;
+  final bool fakeData;
   final List<VariableSuggestion> Function(String text)? keySuggestions;
   final List<VariableSuggestion> Function(String key, String text)?
   valueSuggestions;
@@ -333,6 +342,12 @@ class _KeyValueRowState extends State<_KeyValueRow> {
                   onChanged: (v) => widget.onChanged(row.copyWith(value: v)),
                 ),
               ),
+              if (widget.fakeData)
+                FakeDataButton(
+                  onPicked: (token) => widget.onChanged(
+                    row.copyWith(value: '${row.value}$token'),
+                  ),
+                ),
               SizedBox(
                 width: 64,
                 child: widget.ghost

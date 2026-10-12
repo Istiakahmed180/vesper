@@ -13,6 +13,7 @@ import '../../../../core/utils/id.dart';
 import '../../../../shared/widgets/all_rows_checkbox.dart';
 import '../../../../shared/widgets/code/code_editor.dart';
 import '../../../../shared/widgets/dialogs.dart';
+import '../../../../shared/widgets/fake_data_picker.dart';
 import '../../../../shared/widgets/key_value_editor.dart';
 import '../../../../shared/widgets/section_tabs.dart';
 import '../../../../shared/widgets/variable_field.dart';
@@ -120,6 +121,7 @@ class BodyEditor extends ConsumerWidget {
               child: KeyValueEditor(
                 rows: body.urlEncoded,
                 bulkSeparator: '=',
+                fakeData: true,
                 onChanged: (rows) => set(body.copyWith(urlEncoded: rows)),
               ),
             ),
@@ -491,12 +493,24 @@ class _FormDataRow extends StatelessWidget {
             Expanded(
               flex: 3,
               child: field.kind == FormFieldKind.text
-                  ? VariableField(
-                      value: field.value,
-                      hint: 'Value',
-                      borderless: true,
-                      monospace: true,
-                      onChanged: (v) => onChanged(field.copyWith(value: v)),
+                  ? Row(
+                      children: [
+                        Expanded(
+                          child: VariableField(
+                            value: field.value,
+                            hint: 'Value',
+                            borderless: true,
+                            monospace: true,
+                            onChanged: (v) =>
+                                onChanged(field.copyWith(value: v)),
+                          ),
+                        ),
+                        FakeDataButton(
+                          onPicked: (token) => onChanged(
+                            field.copyWith(value: '${field.value}$token'),
+                          ),
+                        ),
+                      ],
                     )
                   : Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 8),
