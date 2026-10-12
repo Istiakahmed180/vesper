@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import '../../../../core/utils/id.dart';
+import 'fake_data.dart';
 
 /// Result of resolving `{{variables}}` in a piece of text.
 class ResolvedText {
@@ -42,12 +43,16 @@ class VariableResolver {
   final Map<String, VariableValue> globals;
   final Random _random;
   final DateTime Function() _clock;
+  late final _fake = FakeData(random: _random, clock: _clock);
 
-  static const dynamicVariables = {
+  /// Built-in dynamic variables plus the fake-data ones ([FakeData]); every
+  /// use produces a new value.
+  static final Map<String, String> dynamicVariables = {
     r'$guid': 'A random UUID v4',
     r'$timestamp': 'Current Unix timestamp in seconds',
     r'$isoTimestamp': 'Current ISO-8601 timestamp (UTC)',
     r'$randomInt': 'Random integer between 0 and 1000',
+    for (final v in FakeData.variables) v.name: v.description,
   };
 
   VariableValue? lookup(String name) {
@@ -65,7 +70,7 @@ class VariableResolver {
     r'$timestamp' => (_clock().millisecondsSinceEpoch ~/ 1000).toString(),
     r'$isoTimestamp' => _clock().toUtc().toIso8601String(),
     r'$randomInt' => _random.nextInt(1001).toString(),
-    _ => null,
+    _ => _fake.generate(name),
   };
 
   ResolvedText resolve(String input) {

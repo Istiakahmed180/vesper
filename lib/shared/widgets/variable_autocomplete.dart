@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/security/redactor.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
+import '../../features/api_client/domain/services/fake_data.dart';
 import '../../features/api_client/domain/services/variable_resolver.dart';
 import '../../features/environments/presentation/environment_providers.dart';
 import 'variable_scope.dart';
@@ -104,7 +105,12 @@ List<VariableSuggestion> variableSuggestions(
   // Built-in dynamic variables only when asked for explicitly with `{{$`.
   if (query.startsWith(r'$')) {
     for (final e in VariableResolver.dynamicVariables.entries) {
-      all[e.key] = VariableSuggestion(e.key, 'Dynamic', e.value);
+      final fake = FakeData.find(e.key);
+      all[e.key] = VariableSuggestion(
+        e.key,
+        fake == null ? 'Dynamic' : 'Fake · ${fake.category}',
+        e.value,
+      );
     }
   }
 
