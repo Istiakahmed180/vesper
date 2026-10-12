@@ -9,6 +9,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/dialogs.dart';
 import '../../workspace/presentation/workspace_controller.dart';
 import '../domain/environment_models.dart';
+import '../domain/environment_repository.dart';
 import 'environment_providers.dart';
 
 /// Eye button next to the environment selector: shows the variables of the
@@ -194,7 +195,8 @@ class _Section extends StatelessWidget {
 }
 
 /// The variables of one environment, editable in place, plus a row to add
-/// a variable. Changes are saved immediately.
+/// a variable. Changes are saved on Enter, when a field loses focus and when
+/// the panel closes, so typed values are never dropped.
 class _VariableList extends ConsumerStatefulWidget {
   const _VariableList({super.key, required this.environment});
   final Environment environment;
@@ -208,49 +210,93 @@ class _VariableListState extends ConsumerState<_VariableList> {
   final _newValue = TextEditingController();
   final _newKeyFocus = FocusNode();
 
+  /// Captured up front: [ref] can no longer be used once the panel closes,
+  /// which is exactly when the last edits are flushed.
+  late final EnvironmentRepository _repo;
+
+  /// Edited values not saved yet, by variable id.
+  final _drafts = <String, String>{};
+
+  /// What was last saved, until the stream delivers it as
+  /// [widget.environment]; keeps quick successive saves from undoing each
+  /// other.
+  Environment? _saved;
+
+  Environment get _base => _saved ?? widget.environment;
+
+  @override
+  void initState() {
+    super.initState();
+    _repo = ref.read(environmentRepositoryProvider);
+  }
+
+  @override
+  void didUpdateWidget(_VariableList old) {
+    super.didUpdateWidget(old);
+    if (!identical(old.environment, widget.environment)) _saved = null;
+  }
+
   @override
   void dispose() {
+    _flush(includeNew: true);
     _newKey.dispose();
     _newValue.dispose();
     _newKeyFocus.dispose();
     super.dispose();
   }
 
-  Future<void> _save(List<EnvVariable> variables) => guarded(
-    context,
-    () => ref
-        .read(environmentRepositoryProvider)
-        .saveEnvironment(widget.environment.copyWith(variables: variables)),
-  );
+  /// Saves pending value edits (and the new-variable row when
+  /// [includeNew]), optionally dropping [removeId], in one write.
+  Future<void> _flush({bool includeNew = false, String? removeId}) async {
+    final base = _base;
+    final key = _newKey.text.trim();
+    final addNew = includeNew && key.isNotEmpty;
+    if (_drafts.isEmpty && !addNew && removeId == null) return;
+
+    var vars = [
+      for (final v in base.variables)
+        if (v.id != removeId)
+          _drafts.containsKey(v.id) ? v.copyWith(value: _drafts[v.id]) : v,
+    ];
+    _drafts.clear();
+    if (addNew) {
+      final value = _newValue.text;
+      final existing = vars.where((v) => v.key == key).firstOrNull;
+      vars = existing == null
+          ? [
+              ...vars,
+              EnvVariable(
+                key: key,
+                value: value,
+                isSecret: Redactor.isSensitiveKey(key),
+              ),
+            ]
+          : [for (final v in vars) v.key == key ? v.copyWith(value: value) : v];
+      _newKey.clear();
+      _newValue.clear();
+    }
+
+    final updated = base.copyWith(variables: vars);
+    _saved = updated;
+    if (mounted) {
+      await guarded(context, () => _repo.saveEnvironment(updated));
+    } else {
+      // Panel already closed: nowhere to show an error.
+      await _repo.saveEnvironment(updated).catchError((_) {});
+    }
+  }
 
   Future<void> _add() async {
-    final key = _newKey.text.trim();
-    if (key.isEmpty) return;
-    final vars = widget.environment.variables;
-    final existing = vars.where((v) => v.key == key).firstOrNull;
-    await _save([
-      if (existing == null)
-        ...vars
-      else
-        for (final v in vars)
-          v.id == existing.id ? v.copyWith(value: _newValue.text) : v,
-      if (existing == null)
-        EnvVariable(
-          key: key,
-          value: _newValue.text,
-          isSecret: Redactor.isSensitiveKey(key),
-        ),
-    ]);
-    _newKey.clear();
-    _newValue.clear();
-    _newKeyFocus.requestFocus();
+    if (_newKey.text.trim().isEmpty) return;
+    await _flush(includeNew: true);
+    if (mounted) _newKeyFocus.requestFocus();
   }
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
     final mono = AppTheme.mono(context, size: 12.5);
-    final vars = widget.environment.variables;
+    final vars = _base.variables;
     InputDecoration deco(String hint) => InputDecoration(
       hintText: hint,
       isDense: true,
@@ -272,12 +318,15 @@ class _VariableListState extends ConsumerState<_VariableList> {
           _VariableRow(
             key: ValueKey(v.id),
             variable: v,
-            onChanged: (updated) =>
-                _save([for (final e in vars) e.id == v.id ? updated : e]),
-            onRemove: () => _save([
-              for (final e in vars)
-                if (e.id != v.id) e,
-            ]),
+            onDraft: (value) {
+              if (value == v.value) {
+                _drafts.remove(v.id);
+              } else {
+                _drafts[v.id] = value;
+              }
+            },
+            onCommit: _flush,
+            onRemove: () => _flush(removeId: v.id),
           ),
         const SizedBox(height: 6),
         Row(
@@ -322,12 +371,16 @@ class _VariableRow extends StatefulWidget {
   const _VariableRow({
     super.key,
     required this.variable,
-    required this.onChanged,
+    required this.onDraft,
+    required this.onCommit,
     required this.onRemove,
   });
 
   final EnvVariable variable;
-  final ValueChanged<EnvVariable> onChanged;
+
+  /// Reports every edit so the list can save it even if the panel closes.
+  final ValueChanged<String> onDraft;
+  final VoidCallback onCommit;
   final VoidCallback onRemove;
 
   @override
@@ -343,7 +396,7 @@ class _VariableRowState extends State<_VariableRow> {
   void initState() {
     super.initState();
     _focus.addListener(() {
-      if (!_focus.hasFocus) _commit();
+      if (!_focus.hasFocus && mounted) widget.onCommit();
     });
   }
 
@@ -360,12 +413,6 @@ class _VariableRowState extends State<_VariableRow> {
     _value.dispose();
     _focus.dispose();
     super.dispose();
-  }
-
-  void _commit() {
-    if (_value.text != widget.variable.value) {
-      widget.onChanged(widget.variable.copyWith(value: _value.text));
-    }
   }
 
   @override
@@ -403,7 +450,8 @@ class _VariableRowState extends State<_VariableRow> {
                   vertical: 8,
                 ),
               ),
-              onSubmitted: (_) => _commit(),
+              onChanged: widget.onDraft,
+              onSubmitted: (_) => widget.onCommit(),
             ),
           ),
           SizedBox(
