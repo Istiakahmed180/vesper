@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/widgets/dialogs.dart';
+import '../../../../core/security/redactor.dart';
+import '../../../collections/presentation/collection_providers.dart';
+import '../../../environments/domain/environment_models.dart';
 import '../../../environments/presentation/environment_providers.dart';
 import '../../../workspace/domain/workspace_models.dart';
 import '../../../workspace/presentation/variable_updater.dart';
@@ -74,6 +77,7 @@ class _SetVariableDialog extends ConsumerStatefulWidget {
 class _SetVariableDialogState extends ConsumerState<_SetVariableDialog> {
   late final _name = TextEditingController(text: widget.name);
   late final _value = TextEditingController(text: widget.value);
+  final _nameFocus = FocusNode();
   ExtractionTarget? _target;
   bool _saving = false;
 
@@ -83,6 +87,7 @@ class _SetVariableDialogState extends ConsumerState<_SetVariableDialog> {
   void dispose() {
     _name.dispose();
     _value.dispose();
+    _nameFocus.dispose();
     super.dispose();
   }
 
@@ -121,7 +126,8 @@ class _SetVariableDialogState extends ConsumerState<_SetVariableDialog> {
     final colors = context.colors;
     final active = ref.watch(activeEnvironmentProvider);
     final globals = ref.watch(globalsEnvironmentProvider);
-    final hasCollection = _collectionId != null;
+    final collectionId = _collectionId;
+    final hasCollection = collectionId != null;
 
     String label(ExtractionTarget t) => switch (t) {
       ExtractionTarget.environment =>
@@ -145,6 +151,24 @@ class _SetVariableDialogState extends ConsumerState<_SetVariableDialog> {
     final nameOk = _validName.hasMatch(name);
     final canSave = !_saving && nameOk && enabled(target);
 
+    // Variables already in the chosen scope, offered as name suggestions.
+    final existing = (switch (target) {
+      ExtractionTarget.environment => active?.variables,
+      ExtractionTarget.globals => globals?.variables,
+      ExtractionTarget.collection =>
+        collectionId == null
+            ? null
+            : ref
+                  .watch(collectionSettingsProvider(collectionId))
+                  .value
+                  ?.variables,
+    }) ?? const <EnvVariable>[];
+    final names = [
+      for (final v in existing)
+        if (v.key.trim().isNotEmpty) v,
+    ];
+    final overwrites = names.any((v) => v.key == name);
+
     return AlertDialog(
       title: const Text('Set as variable'),
       content: SizedBox(
@@ -153,19 +177,102 @@ class _SetVariableDialogState extends ConsumerState<_SetVariableDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            TextField(
-              key: const ValueKey('set-variable-name'),
-              controller: _name,
-              autofocus: true,
-              decoration: InputDecoration(
-                labelText: 'Variable name',
-                helperText: nameOk ? 'Use it as {{$name}}' : null,
-                errorText: name.isNotEmpty && !nameOk
-                    ? 'No spaces or braces'
-                    : null,
+            // Free text, with the scope's existing names as suggestions.
+            RawAutocomplete<EnvVariable>(
+              textEditingController: _name,
+              focusNode: _nameFocus,
+              displayStringForOption: (v) => v.key,
+              optionsBuilder: (value) {
+                final q = value.text.trim().toLowerCase();
+                return names
+                    .where(
+                      (v) =>
+                          v.key.toLowerCase().contains(q) &&
+                          v.key != value.text.trim(),
+                    )
+                    .take(8);
+              },
+              onSelected: (_) => setState(() {}),
+              fieldViewBuilder: (context, controller, focusNode, submit) =>
+                  TextField(
+                    key: const ValueKey('set-variable-name'),
+                    controller: controller,
+                    focusNode: focusNode,
+                    autofocus: true,
+                    decoration: InputDecoration(
+                      labelText: 'Variable name',
+                      hintText: names.isEmpty
+                          ? null
+                          : 'New name, or pick an existing one',
+                      helperText: !nameOk
+                          ? null
+                          : overwrites
+                          ? 'Replaces the current value of {{$name}}'
+                          : 'Creates {{$name}}',
+                      errorText: name.isNotEmpty && !nameOk
+                          ? 'No spaces or braces'
+                          : null,
+                    ),
+                    onChanged: (_) => setState(() {}),
+                    onSubmitted: (_) => canSave ? _save(target) : null,
+                  ),
+              optionsViewBuilder: (context, onSelected, options) => Align(
+                alignment: Alignment.topLeft,
+                child: Material(
+                  elevation: 8,
+                  color: colors.panelRaised,
+                  borderRadius: BorderRadius.circular(6),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      maxWidth: 440,
+                      maxHeight: 240,
+                    ),
+                    child: ListView(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      shrinkWrap: true,
+                      children: [
+                        for (final v in options)
+                          InkWell(
+                            key: ValueKey('set-variable-option-${v.key}'),
+                            onTap: () => onSelected(v),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 7,
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      v.key,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: colors.variable,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Flexible(
+                                    child: Text(
+                                      v.isSecret ? Redactor.mask : v.value,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: colors.textMuted,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
-              onChanged: (_) => setState(() {}),
-              onSubmitted: (_) => canSave ? _save(target) : null,
             ),
             const SizedBox(height: 12),
             TextField(
@@ -199,7 +306,8 @@ class _SetVariableDialogState extends ConsumerState<_SetVariableDialog> {
             ),
             const SizedBox(height: 8),
             Text(
-              'An existing variable with this name is overwritten.',
+              'Click the name field to see the variables already in this '
+              'scope.',
               style: TextStyle(fontSize: 12, color: colors.textMuted),
             ),
           ],
