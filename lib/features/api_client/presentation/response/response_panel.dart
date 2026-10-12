@@ -605,6 +605,7 @@ class _BodyViewState extends State<_BodyView> {
         } else if (!identical(controller.body, data)) {
           controller.body = data;
         }
+        final view = controller;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -623,7 +624,7 @@ class _BodyViewState extends State<_BodyView> {
             Expanded(
               child: Consumer(
                 builder: (context, ref, _) => CodeView(
-                  controller: controller,
+                  controller: view,
                   extraMenuItems: (selection) => [
                     ?setVariableMenuItem(
                       context,
