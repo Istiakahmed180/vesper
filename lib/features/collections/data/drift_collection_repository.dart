@@ -674,6 +674,18 @@ class DriftCollectionRepository implements CollectionRepository {
   }
 
   @override
+  Future<void> importIntoCollection(
+    String id,
+    CollectionDocument document,
+  ) async {
+    await _db.transaction(() async {
+      final start = await _nextSortInLocation(TreeLocation(id));
+      await _insertItems(document.items, id, null, startOrder: start);
+    });
+    await _touchCollection(id);
+  }
+
+  @override
   Future<void> replaceCollection(String id, CollectionDocument document) async {
     final settings = _keepLocalSecrets(
       document.settings,
@@ -706,9 +718,10 @@ class DriftCollectionRepository implements CollectionRepository {
   Future<void> _insertItems(
     List<CollectionItem> items,
     String collectionId,
-    String? folderId,
-  ) async {
-    var order = 0;
+    String? folderId, {
+    int startOrder = 0,
+  }) async {
+    var order = startOrder;
     for (final item in items) {
       switch (item) {
         case FolderItem():

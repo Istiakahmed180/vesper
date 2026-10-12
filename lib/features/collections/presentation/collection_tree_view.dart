@@ -418,6 +418,15 @@ class _CollectionRow extends ConsumerWidget {
               onPressed: () => showSyncDialog(context, collectionId: c.id),
               child: const Text('Sync with GitHub…'),
             ),
+            MenuItemButton(
+              key: const ValueKey('collection-import'),
+              leadingIcon: const Icon(Icons.file_download_outlined, size: 16),
+              onPressed: () => ImportExportActions(
+                ref,
+                context,
+              ).importIntoCollection(c.id, c.name),
+              child: const Text('Import…'),
+            ),
             if (otherWorkspaces.isNotEmpty)
               SubmenuButton(
                 leadingIcon: const Icon(

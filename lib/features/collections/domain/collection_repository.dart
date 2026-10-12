@@ -86,6 +86,10 @@ abstract class CollectionRepository {
   /// Creates a new collection from [document] and returns its id.
   Future<String> importCollection(CollectionDocument document);
 
+  /// Appends the items of [document] to the root of an existing collection.
+  /// The collection's name, description and settings are left unchanged.
+  Future<void> importIntoCollection(String id, CollectionDocument document);
+
   /// Replaces the contents of an existing collection (used by sync pull).
   Future<void> replaceCollection(String id, CollectionDocument document);
 }
