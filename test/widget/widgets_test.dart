@@ -1,7 +1,7 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vesper/core/di/app_providers.dart';
@@ -230,6 +230,25 @@ void main() {
     expect(find.text('201 Created'), findsOneWidget);
     expect(find.textContaining('"id"', findRichText: true), findsWidgets);
     expect(history.entries.single.statusCode, 201);
+
+    // The Copy button copies the whole formatted body.
+    String? copied;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copied = (call.arguments as Map)['text'] as String?;
+        }
+        return null;
+      },
+    );
+    await tester.tap(find.byTooltip('Copy body'));
+    await tester.pumpAndSettle();
+    final sent = container.read(responseProvider(tabId)) as ResponseSuccess;
+    expect(
+      jsonDecode(copied!),
+      jsonDecode(utf8.decode(sent.response.bodyBytes)),
+    );
 
     http.error = const NetworkFailure(
       NetworkFailureKind.dnsFailure,
