@@ -83,7 +83,7 @@ void main() {
 
       final sub = container.listen(
         collectionTreesProvider,
-        (_, __) {},
+        (_, _) {},
         fireImmediately: true,
       );
       addTearDown(sub.close);
