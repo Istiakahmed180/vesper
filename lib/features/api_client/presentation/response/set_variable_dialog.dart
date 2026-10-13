@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/security/redactor.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/widgets/dialogs.dart';
-import '../../../../core/security/redactor.dart';
 import '../../../collections/presentation/collection_providers.dart';
 import '../../../environments/domain/environment_models.dart';
 import '../../../environments/presentation/environment_providers.dart';
