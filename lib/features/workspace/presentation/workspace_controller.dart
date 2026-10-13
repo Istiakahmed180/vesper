@@ -48,7 +48,17 @@ class WorkspaceController extends Notifier<WorkspaceState> {
       // previous workspace's trees; syncing against them would unlink tabs.
       if (next.isLoading) return;
       final trees = next.value;
-      if (trees != null) _syncWithSavedRequests(trees);
+      if (trees != null) {
+        _syncWithSavedRequests(trees);
+        final tab = state.activeTab;
+        if (tab is RequestTab) {
+          final reqId = tab.savedRequestId ?? tab.draft.id;
+          final ancestorIds = trees.ancestorIdsForRequest(reqId);
+          if (ancestorIds.isNotEmpty) {
+            ref.read(expandedNodesProvider.notifier).expand(ancestorIds);
+          }
+        }
+      }
     });
     ref.onDispose(() => _persistTimer?.cancel());
     return _blankState();
@@ -80,8 +90,19 @@ class WorkspaceController extends Notifier<WorkspaceState> {
   // ------------------------------------------------------------------ tabs
 
   void activate(String tabId) {
-    if (state.tab(tabId) != null) {
+    final tab = state.tab(tabId);
+    if (tab != null) {
       _set(state.copyWith(activeTabId: () => tabId));
+      if (tab is RequestTab) {
+        final trees = ref.read(collectionTreesProvider).value;
+        if (trees != null) {
+          final reqId = tab.savedRequestId ?? tab.draft.id;
+          final ancestorIds = trees.ancestorIdsForRequest(reqId);
+          if (ancestorIds.isNotEmpty) {
+            ref.read(expandedNodesProvider.notifier).expand(ancestorIds);
+          }
+        }
+      }
     }
   }
 
@@ -377,6 +398,17 @@ class WorkspaceController extends Notifier<WorkspaceState> {
   void _set(WorkspaceState next, {bool persist = true}) {
     state = next;
     if (persist) _schedulePersist();
+    final tab = next.activeTab;
+    if (tab is RequestTab) {
+      final trees = ref.read(collectionTreesProvider).value;
+      if (trees != null) {
+        final reqId = tab.savedRequestId ?? tab.draft.id;
+        final ancestorIds = trees.ancestorIdsForRequest(reqId);
+        if (ancestorIds.isNotEmpty) {
+          ref.read(expandedNodesProvider.notifier).expand(ancestorIds);
+        }
+      }
+    }
   }
 
   /// Keeps open tabs consistent with renames/deletes made in the sidebar.

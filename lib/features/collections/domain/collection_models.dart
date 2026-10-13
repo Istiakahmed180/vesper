@@ -242,6 +242,42 @@ class CollectionTree {
 
     yield* walk(children);
   }
+
+  /// Finds the set of ancestor IDs (the collection ID and any folder IDs along
+  /// the tree path down to [requestId]) if [requestId] exists in this tree.
+  Set<String>? ancestorIdsForRequest(String requestId) {
+    final path = <String>[];
+    bool search(List<TreeNode> nodes) {
+      for (final n in nodes) {
+        switch (n) {
+          case FolderNode(:final folder, :final children):
+            path.add(folder.id);
+            if (search(children)) return true;
+            path.removeLast();
+          case RequestNode(:final request):
+            if (request.id == requestId) return true;
+        }
+      }
+      return false;
+    }
+
+    if (search(children)) {
+      return {collection.id, ...path};
+    }
+    return null;
+  }
+}
+
+extension CollectionTreesX on List<CollectionTree> {
+  /// Returns the ancestor IDs (collection ID + folder IDs) for [requestId]
+  /// across all collection trees.
+  Set<String> ancestorIdsForRequest(String requestId) {
+    for (final tree in this) {
+      final ids = tree.ancestorIdsForRequest(requestId);
+      if (ids != null) return ids;
+    }
+    return const {};
+  }
 }
 
 /// Where a request or folder should be placed.
