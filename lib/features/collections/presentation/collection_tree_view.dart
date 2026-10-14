@@ -87,25 +87,23 @@ class CollectionTreeView extends ConsumerWidget {
     final searching = filtered != null;
 
     final activeTab = ref.watch(workspaceProvider.select((s) => s.activeTab));
-    ref.listen<WorkspaceTab?>(
-      workspaceProvider.select((s) => s.activeTab),
-      (previous, next) {
-        if (next is RequestTab) {
-          _autoExpandActiveRequest(ref, next, treesAsync.value);
-        }
-      },
-    );
-    ref.listen<AsyncValue<List<CollectionTree>>>(
-      collectionTreesProvider,
-      (previous, next) {
-        final currentTab = ref.read(
-          workspaceProvider.select((s) => s.activeTab),
-        );
-        if (currentTab is RequestTab && next.value != null) {
-          _autoExpandActiveRequest(ref, currentTab, next.value);
-        }
-      },
-    );
+    ref.listen<WorkspaceTab?>(workspaceProvider.select((s) => s.activeTab), (
+      previous,
+      next,
+    ) {
+      if (next is RequestTab) {
+        _autoExpandActiveRequest(ref, next, treesAsync.value);
+      }
+    });
+    ref.listen<AsyncValue<List<CollectionTree>>>(collectionTreesProvider, (
+      previous,
+      next,
+    ) {
+      final currentTab = ref.read(workspaceProvider.select((s) => s.activeTab));
+      if (currentTab is RequestTab && next.value != null) {
+        _autoExpandActiveRequest(ref, currentTab, next.value);
+      }
+    });
 
     if (activeTab is RequestTab && treesAsync.value != null) {
       _autoExpandActiveRequest(ref, activeTab, treesAsync.value);
@@ -643,6 +641,13 @@ class _FolderRow extends ConsumerWidget {
                 success: 'Folder duplicated',
               ),
               child: const Text('Duplicate'),
+            ),
+            MenuItemButton(
+              key: const ValueKey('folder-export'),
+              leadingIcon: const Icon(Icons.ios_share, size: 16),
+              onPressed: () =>
+                  ImportExportActions(ref, context).exportFolder(f.id, f.name),
+              child: const Text('Export…'),
             ),
             const Divider(),
             if (node.children.isNotEmpty)
