@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart' show driftRuntimeOptions;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vesper/core/errors/app_failure.dart';
 import 'package:vesper/core/security/secret_vault.dart';
 import 'package:vesper/core/storage/app_database.dart';
 import 'package:vesper/features/api_client/domain/models/api_request.dart';
@@ -179,6 +180,64 @@ void main() {
       expect(
         (await repo.getRequest(importedReq.id))!.auth,
         const BearerAuth(token: 'secret'),
+      );
+    });
+
+    test('exports a single folder with the collection settings', () async {
+      final c = await repo.createCollection('Chat API');
+      await repo.saveSettings(
+        c.id,
+        const CollectionSettings(auth: BearerAuth(token: '{{token}}')),
+      );
+      final conversations = await repo.createFolder(c.id, 'Conversations');
+      final threads = await repo.createFolder(
+        c.id,
+        'Threads',
+        parentId: conversations.id,
+      );
+      final users = await repo.createFolder(c.id, 'Users');
+      await repo.saveRequest(
+        ApiRequest(
+          name: 'List',
+          collectionId: c.id,
+          folderId: conversations.id,
+          auth: const InheritAuth(),
+        ),
+      );
+      await repo.saveRequest(
+        ApiRequest(name: 'Messages', collectionId: c.id, folderId: threads.id),
+      );
+      await repo.saveRequest(
+        ApiRequest(name: 'Profile', collectionId: c.id, folderId: users.id),
+      );
+
+      final doc = await repo.exportFolder(conversations.id);
+      expect(doc.name, 'Conversations');
+      expect(doc.items, hasLength(2));
+      expect((doc.items[0] as FolderItem).name, 'Threads');
+      expect(
+        ((doc.items[0] as FolderItem).items.single as RequestItem).request.name,
+        'Messages',
+      );
+      expect((doc.items[1] as RequestItem).request.name, 'List');
+      // Secrets are left out unless asked for.
+      expect(doc.settings.auth, const BearerAuth());
+      final full = await repo.exportFolder(
+        conversations.id,
+        includeSecrets: true,
+      );
+      expect(full.settings.auth, const BearerAuth(token: '{{token}}'));
+
+      // Importing it gives a collection with just that folder's requests.
+      final id = await repo.importCollection(doc);
+      final tree = (await repo.watchTrees().first).firstWhere(
+        (t) => t.collection.id == id,
+      );
+      expect(tree.allRequests.map((r) => r.name).toSet(), {'Messages', 'List'});
+
+      await expectLater(
+        repo.exportFolder('missing'),
+        throwsA(isA<StorageFailure>()),
       );
     });
 

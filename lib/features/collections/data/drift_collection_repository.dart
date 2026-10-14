@@ -464,24 +464,7 @@ class DriftCollectionRepository implements CollectionRepository {
     if (folder == null) {
       throw const StorageFailure('The folder no longer exists.');
     }
-    final tree = (await _loadTrees()).firstWhere(
-      (t) => t.collection.id == folder.collectionId,
-    );
-    FolderNode? find(List<TreeNode> nodes) {
-      for (final n in nodes) {
-        if (n is FolderNode) {
-          if (n.id == id) return n;
-          final inner = find(n.children);
-          if (inner != null) return inner;
-        }
-      }
-      return null;
-    }
-
-    final node = find(tree.children);
-    if (node == null) {
-      throw const StorageFailure('The folder no longer exists.');
-    }
+    final node = await _folderNode(folder);
     final items = await _itemsFromNodes(node.children, includeSecrets: true);
     late String newId;
     await _db.transaction(() async {
@@ -493,6 +476,28 @@ class DriftCollectionRepository implements CollectionRepository {
       );
     });
     return newId;
+  }
+
+  Future<FolderNode> _folderNode(FolderRow folder) async {
+    final tree = (await _loadTrees()).firstWhere(
+      (t) => t.collection.id == folder.collectionId,
+    );
+    FolderNode? find(List<TreeNode> nodes) {
+      for (final n in nodes) {
+        if (n is FolderNode) {
+          if (n.id == folder.id) return n;
+          final inner = find(n.children);
+          if (inner != null) return inner;
+        }
+      }
+      return null;
+    }
+
+    final node = find(tree.children);
+    if (node == null) {
+      throw const StorageFailure('The folder no longer exists.');
+    }
+    return node;
   }
 
   @override
@@ -632,6 +637,34 @@ class DriftCollectionRepository implements CollectionRepository {
                   v.isSecret ? v.copyWith(value: '') : v,
               ],
             ),
+    );
+  }
+
+  @override
+  Future<CollectionDocument> exportFolder(
+    String id, {
+    bool includeSecrets = false,
+  }) async {
+    final folder = await (_db.select(
+      _db.folders,
+    )..where((f) => f.id.equals(id))).getSingleOrNull();
+    if (folder == null) {
+      throw const StorageFailure('The folder no longer exists.');
+    }
+    // The collection's auth and variables come along, so requests that
+    // inherit them keep working after an import.
+    final collection = await exportCollection(
+      folder.collectionId,
+      includeSecrets: includeSecrets,
+    );
+    final node = await _folderNode(folder);
+    return CollectionDocument(
+      name: folder.name,
+      items: await _itemsFromNodes(
+        node.children,
+        includeSecrets: includeSecrets,
+      ),
+      settings: collection.settings,
     );
   }
 
