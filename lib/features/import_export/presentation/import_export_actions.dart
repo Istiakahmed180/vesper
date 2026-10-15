@@ -219,6 +219,25 @@ class ImportExportActions {
     }
   }
 
+  /// Exports only the folder [id]: its subfolders and requests, plus the
+  /// collection's auth and variables so inherited auth keeps working.
+  Future<void> exportFolder(String id, String name) async {
+    final includeSecrets = await _askIncludeSecrets('folder');
+    if (includeSecrets == null) return;
+    try {
+      final doc = await ref
+          .read(collectionRepositoryProvider)
+          .exportFolder(id, includeSecrets: includeSecrets);
+      final json = const VesperCollectionCodec().encode(
+        doc,
+        includeSecrets: includeSecrets,
+      );
+      await _save('${Formatters.slug(name)}.vesper.json', json);
+    } catch (e) {
+      if (context.mounted) showToast(context, e.userMessage, error: true);
+    }
+  }
+
   Future<void> exportEnvironment(Environment env) async {
     final hasSecrets = env.variables.any((v) => v.isSecret);
     final includeSecrets = hasSecrets

@@ -83,6 +83,13 @@ abstract class CollectionRepository {
     bool includeSecrets = false,
   });
 
+  /// Exports one folder as a collection document named after the folder,
+  /// with the folder's contents and the collection's auth and variables.
+  Future<CollectionDocument> exportFolder(
+    String id, {
+    bool includeSecrets = false,
+  });
+
   /// Creates a new collection from [document] and returns its id.
   Future<String> importCollection(CollectionDocument document);
 
