@@ -199,18 +199,6 @@ class WorkspaceController extends Notifier<WorkspaceState> {
     _set(WorkspaceState(tabs: tabs, activeTabId: active));
   }
 
-  void closeOtherTabs(String keepId) {
-    for (final t in state.tabs.where((t) => t.id != keepId).toList()) {
-      ref.invalidate(responseProvider(t.id));
-    }
-    _set(
-      WorkspaceState(
-        tabs: state.tabs.where((t) => t.id == keepId).toList(),
-        activeTabId: keepId,
-      ),
-    );
-  }
-
   void duplicateTab(String tabId) {
     final tab = state.tab(tabId);
     if (tab is! RequestTab) return;

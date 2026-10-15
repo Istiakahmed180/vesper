@@ -79,6 +79,35 @@ class WorkspaceActions {
     _ws.closeTab(tab.id);
   }
 
+  void closeOtherTabs(String tabId) =>
+      _closeAround(tabId, (i, at) => i != at);
+
+  void closeTabsToLeft(String tabId) => _closeAround(tabId, (i, at) => i < at);
+
+  void closeTabsToRight(String tabId) =>
+      _closeAround(tabId, (i, at) => i > at);
+
+  /// Closes the tabs around [tabId] one by one, asking about unsaved changes
+  /// for each; stops when the user cancels.
+  Future<void> _closeAround(
+    String tabId,
+    bool Function(int index, int at) closes,
+  ) async {
+    final tabs = ref.read(workspaceProvider).tabs;
+    final at = tabs.indexWhere((t) => t.id == tabId);
+    if (at == -1) return;
+    final ids = [
+      for (final (i, t) in tabs.indexed)
+        if (closes(i, at)) t.id,
+    ];
+    for (final id in ids) {
+      await closeTab(id);
+      if (!context.mounted) return;
+      if (ref.read(workspaceProvider).tab(id) != null) break;
+    }
+    if (ref.read(workspaceProvider).tab(tabId) != null) _ws.activate(tabId);
+  }
+
   void duplicateTab([String? tabId]) {
     final id = tabId ?? _activeId;
     if (id != null) _ws.duplicateTab(id);

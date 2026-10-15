@@ -126,6 +126,11 @@ class _TabItemState extends ConsumerState<_TabItem> {
     final loading = ref.watch(
       responseProvider(tab.id).select((s) => s is ResponseLoading),
     );
+    final (isFirst, isLast) = ref.watch(
+      workspaceProvider.select(
+        (s) => (s.tabs.first.id == tab.id, s.tabs.last.id == tab.id),
+      ),
+    );
     final title = switch (tab) {
       RequestTab() => tab.title,
       EnvironmentTab(:final environmentId, :final name) =>
@@ -159,9 +164,22 @@ class _TabItemState extends ConsumerState<_TabItem> {
           child: const Text('Close'),
         ),
         MenuItemButton(
-          onPressed: () =>
-              ref.read(workspaceProvider.notifier).closeOtherTabs(tab.id),
+          onPressed: isFirst && isLast
+              ? null
+              : () => widget.actions.closeOtherTabs(tab.id),
           child: const Text('Close other tabs'),
+        ),
+        MenuItemButton(
+          onPressed: isFirst
+              ? null
+              : () => widget.actions.closeTabsToLeft(tab.id),
+          child: const Text('Close tabs to the left'),
+        ),
+        MenuItemButton(
+          onPressed: isLast
+              ? null
+              : () => widget.actions.closeTabsToRight(tab.id),
+          child: const Text('Close tabs to the right'),
         ),
         if (tab is RequestTab)
           MenuItemButton(
