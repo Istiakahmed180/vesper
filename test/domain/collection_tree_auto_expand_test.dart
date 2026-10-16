@@ -68,7 +68,7 @@ void main() {
       final ancestors = [tree].ancestorIdsForFolder('f2');
       expect(ancestors, equals({'c1', 'f1', 'f2'}));
 
-      final locAncestors = [tree].ancestorIdsForLocation(TreeLocation('c1', 'f2'));
+      final locAncestors = [tree].ancestorIdsForLocation(const TreeLocation('c1', 'f2'));
       expect(locAncestors, equals({'c1', 'f1', 'f2'}));
     });
   });
