@@ -283,10 +283,11 @@ class WorkspaceController extends Notifier<WorkspaceState> {
     if (current is RequestTab) {
       _replaceTab(tabId, current.copyWith(draft: saved, baseline: () => saved));
     }
-    ref.read(expandedNodesProvider.notifier).expand([
-      saved.collectionId!,
-      if (saved.folderId != null) saved.folderId!,
-    ]);
+    final trees = ref.read(collectionTreesProvider).value ?? const [];
+    if (saved.collectionId != null) {
+      final loc = TreeLocation(saved.collectionId!, saved.folderId);
+      ref.read(expandedNodesProvider.notifier).expand(trees.ancestorIdsForLocation(loc));
+    }
     return saved;
   }
 

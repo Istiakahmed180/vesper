@@ -52,6 +52,27 @@ void main() {
     });
   });
 
+  group('CollectionTree ancestorIdsForFolder and ancestorIdsForLocation', () {
+    test('returns collection and parent folder IDs for a subfolder', () {
+      final col = Collection(id: 'c1', name: 'Collection');
+      final folder1 = Folder(id: 'f1', collectionId: 'c1', name: 'Folder 1');
+      final folder2 = Folder(
+        id: 'f2',
+        collectionId: 'c1',
+        parentId: 'f1',
+        name: 'Folder 2',
+      );
+
+      final tree = CollectionTree.build(col, [folder1, folder2], []);
+
+      final ancestors = [tree].ancestorIdsForFolder('f2');
+      expect(ancestors, equals({'c1', 'f1', 'f2'}));
+
+      final locAncestors = [tree].ancestorIdsForLocation(TreeLocation('c1', 'f2'));
+      expect(locAncestors, equals({'c1', 'f1', 'f2'}));
+    });
+  });
+
   test(
     'selecting/activating a request tab expands its parent folders and collection',
     () async {

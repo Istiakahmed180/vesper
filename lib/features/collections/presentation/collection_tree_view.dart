@@ -238,10 +238,8 @@ Future<void> _addRequest(
         ),
   );
   if (saved == null) return;
-  ref.read(expandedNodesProvider.notifier).expand([
-    loc.collectionId,
-    ?loc.folderId,
-  ]);
+  final trees = ref.read(collectionTreesProvider).value ?? const [];
+  ref.read(expandedNodesProvider.notifier).expand(trees.ancestorIdsForLocation(loc));
   await ref.read(workspaceProvider.notifier).openSavedRequest(saved.id);
 }
 
@@ -263,11 +261,10 @@ Future<void> _addFolder(
         .createFolder(loc.collectionId, name, parentId: loc.folderId),
   );
   if (f != null) {
-    ref.read(expandedNodesProvider.notifier).expand([
-      loc.collectionId,
-      ?loc.folderId,
-      f.id,
-    ]);
+    final trees = ref.read(collectionTreesProvider).value ?? const [];
+    ref.read(expandedNodesProvider.notifier).expand(
+      trees.ancestorIdsForLocation(TreeLocation(loc.collectionId, f.id)),
+    );
   }
 }
 
@@ -385,7 +382,8 @@ class _CollectionRow extends ConsumerWidget {
               () => repo.reorderCollection(collection.id, index),
             );
         }
-        ref.read(expandedNodesProvider.notifier).expand([c.id]);
+        final trees = ref.read(collectionTreesProvider).value ?? const [];
+        ref.read(expandedNodesProvider.notifier).expand(trees.ancestorIdsForLocation(loc));
       },
       builder: (context, candidates, _) => Draggable<TreeDrag>(
         data: CollectionDrag(c, index),
@@ -595,7 +593,8 @@ class _FolderRow extends ConsumerWidget {
           case CollectionDrag():
             break;
         }
-        ref.read(expandedNodesProvider.notifier).expand([f.id]);
+        final trees = ref.read(collectionTreesProvider).value ?? const [];
+        ref.read(expandedNodesProvider.notifier).expand(trees.ancestorIdsForLocation(inside));
       },
       builder: (context, candidates, _) => Draggable<TreeDrag>(
         data: FolderDrag(f),
@@ -752,14 +751,17 @@ class _RequestRow extends ConsumerWidget {
           d.data is RequestDrag && (d.data as RequestDrag).request.id != r.id,
       onAcceptWithDetails: (d) async {
         final dragged = (d.data as RequestDrag).request;
+        final loc = TreeLocation(r.collectionId!, r.folderId);
         await guarded(
           context,
           () => repo.moveRequest(
             dragged.id,
-            TreeLocation(r.collectionId!, r.folderId),
+            loc,
             index: index,
           ),
         );
+        final trees = ref.read(collectionTreesProvider).value ?? const [];
+        ref.read(expandedNodesProvider.notifier).expand(trees.ancestorIdsForLocation(loc));
       },
       builder: (context, candidates, _) => Draggable<TreeDrag>(
         data: RequestDrag(r),

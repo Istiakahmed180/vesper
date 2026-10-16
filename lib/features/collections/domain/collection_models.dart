@@ -266,6 +266,31 @@ class CollectionTree {
     }
     return null;
   }
+
+  /// Finds the set of ancestor IDs (the collection ID and any folder IDs along
+  /// the tree path down to [folderId]) if [folderId] exists in this tree.
+  Set<String>? ancestorIdsForFolder(String folderId) {
+    final path = <String>[];
+    bool search(List<TreeNode> nodes) {
+      for (final n in nodes) {
+        switch (n) {
+          case FolderNode(:final folder, :final children):
+            path.add(folder.id);
+            if (folder.id == folderId) return true;
+            if (search(children)) return true;
+            path.removeLast();
+          case RequestNode():
+            break;
+        }
+      }
+      return false;
+    }
+
+    if (search(children)) {
+      return {collection.id, ...path};
+    }
+    return null;
+  }
 }
 
 extension CollectionTreesX on List<CollectionTree> {
@@ -277,6 +302,28 @@ extension CollectionTreesX on List<CollectionTree> {
       if (ids != null) return ids;
     }
     return const {};
+  }
+
+  /// Returns the ancestor IDs (collection ID + folder IDs) for [folderId]
+  /// across all collection trees.
+  Set<String> ancestorIdsForFolder(String folderId) {
+    for (final tree in this) {
+      final ids = tree.ancestorIdsForFolder(folderId);
+      if (ids != null) return ids;
+    }
+    return const {};
+  }
+
+  /// Returns the ancestor IDs for a [TreeLocation] across all collection trees.
+  Set<String> ancestorIdsForLocation(TreeLocation loc) {
+    for (final tree in this) {
+      if (tree.collection.id == loc.collectionId) {
+        if (loc.folderId == null) return {loc.collectionId};
+        final ids = tree.ancestorIdsForFolder(loc.folderId!);
+        if (ids != null) return ids;
+      }
+    }
+    return {loc.collectionId, if (loc.folderId != null) loc.folderId!};
   }
 }
 
