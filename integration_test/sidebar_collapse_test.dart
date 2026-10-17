@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:drift/native.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -158,6 +159,30 @@ void main() {
     await click('Conversations');
     expect(shown('List Conversations'), isTrue);
     await shot(tester, '07_reopened');
+
+    // Mouse clicks that move a few pixels (as on Windows) still toggle.
+    Future<void> shakyClick(String name) async {
+      final gesture = await tester.startGesture(
+        tester.getCenter(row(name)),
+        kind: PointerDeviceKind.mouse,
+      );
+      await gesture.moveBy(const Offset(2, 1));
+      await gesture.moveBy(const Offset(1, 3));
+      await gesture.up();
+      await settle();
+    }
+
+    await shakyClick('Business Supplier API');
+    expect(shown('CABEX Linking'), isTrue);
+    await shakyClick('CABEX Linking');
+    expect(shown('Link CABEX User'), isTrue);
+    await shakyClick('CABEX Linking');
+    expect(shown('Link CABEX User'), isFalse);
+    await shakyClick('Business Supplier API');
+    expect(shown('CABEX Linking'), isFalse);
+    await shakyClick('Chat API');
+    expect(shown('Conversations'), isFalse);
+    await shot(tester, '08_shaky_clicks');
 
     await tester.pump(const Duration(seconds: 3));
   });

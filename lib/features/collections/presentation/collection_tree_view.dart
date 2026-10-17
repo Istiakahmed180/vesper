@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -231,6 +232,55 @@ Future<void> _addFolder(
   }
 }
 
+/// A tree row that can be dragged to move it. A drag only starts after the
+/// pointer travels a few pixels: the stock [Draggable] starts after 1 px for
+/// a mouse, so an ordinary click with a slight hand movement (common with a
+/// mouse on Windows) became a drag and the row never collapsed.
+class _TreeDraggable extends Draggable<TreeDrag> {
+  const _TreeDraggable({
+    required super.data,
+    required super.feedback,
+    required super.child,
+  });
+
+  /// Distance a press must move before it becomes a drag.
+  static const slop = 8.0;
+
+  @override
+  MultiDragGestureRecognizer createRecognizer(
+    GestureMultiDragStartCallback onStart,
+  ) =>
+      _SlopMultiDragRecognizer(allowedButtonsFilter: allowedButtonsFilter)
+        ..onStart = onStart;
+}
+
+class _SlopMultiDragRecognizer extends MultiDragGestureRecognizer {
+  _SlopMultiDragRecognizer({super.allowedButtonsFilter})
+    : super(debugOwner: null);
+
+  @override
+  MultiDragPointerState createNewPointerState(PointerDownEvent event) =>
+      _SlopPointerState(event.position, event.kind, gestureSettings);
+
+  @override
+  String get debugDescription => 'tree row drag';
+}
+
+class _SlopPointerState extends MultiDragPointerState {
+  _SlopPointerState(super.initialPosition, super.kind, super.gestureSettings);
+
+  @override
+  void checkForResolutionAfterMove() {
+    if (pendingDelta!.distance > _TreeDraggable.slop) {
+      resolve(GestureDisposition.accepted);
+    }
+  }
+
+  @override
+  void accepted(GestureMultiDragStartCallback starter) =>
+      starter(initialPosition);
+}
+
 /// Shared row chrome: hover, selection, indentation, context menu.
 class _TreeRowShell extends StatefulWidget {
   const _TreeRowShell({
@@ -332,7 +382,11 @@ class _CollectionRow extends ConsumerWidget {
     ];
 
     return DragTarget<TreeDrag>(
-      onWillAcceptWithDetails: (d) => true,
+      // Dropping a collection on itself is a click that moved, not a move.
+      onWillAcceptWithDetails: (d) => switch (d.data) {
+        CollectionDrag(:final collection) => collection.id != c.id,
+        _ => true,
+      },
       onAcceptWithDetails: (d) async {
         switch (d.data) {
           case RequestDrag(:final request):
@@ -350,7 +404,7 @@ class _CollectionRow extends ConsumerWidget {
             .read(expandedNodesProvider.notifier)
             .expand(trees.ancestorIdsForLocation(loc));
       },
-      builder: (context, candidates, _) => Draggable<TreeDrag>(
+      builder: (context, candidates, _) => _TreeDraggable(
         data: CollectionDrag(c, index),
         feedback: _DragFeedback(
           label: c.name,
@@ -563,7 +617,7 @@ class _FolderRow extends ConsumerWidget {
             .read(expandedNodesProvider.notifier)
             .expand(trees.ancestorIdsForLocation(inside));
       },
-      builder: (context, candidates, _) => Draggable<TreeDrag>(
+      builder: (context, candidates, _) => _TreeDraggable(
         data: FolderDrag(f),
         feedback: _DragFeedback(label: f.name, icon: Icons.folder_outlined),
         child: _TreeRowShell(
@@ -737,7 +791,7 @@ class _RequestRow extends ConsumerWidget {
             .read(expandedNodesProvider.notifier)
             .expand(trees.ancestorIdsForLocation(loc));
       },
-      builder: (context, candidates, _) => Draggable<TreeDrag>(
+      builder: (context, candidates, _) => _TreeDraggable(
         data: RequestDrag(r),
         feedback: _DragFeedback(label: r.name, method: r),
         child: Stack(

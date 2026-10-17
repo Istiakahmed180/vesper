@@ -9,6 +9,7 @@ import 'package:window_manager/window_manager.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/di/app_providers.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/shutdown.dart';
 import '../../../shared/widgets/dialogs.dart';
 import '../../api_client/presentation/request/request_editor.dart';
 import '../../cloud_sync/presentation/cloud_sync_controller.dart';
@@ -43,6 +44,7 @@ class _AppShellState extends ConsumerState<AppShell> with WindowListener {
   late final bool _windowManaged;
   late final AppLifecycleListener _lifecycle;
   Future<bool>? _pendingExit;
+  Future<void>? _cleanup;
   bool _exitConfirmed = false;
 
   @override
@@ -66,25 +68,41 @@ class _AppShellState extends ConsumerState<AppShell> with WindowListener {
 
   Future<AppExitResponse> _onExitRequested() async {
     if (!await _confirmExit()) return AppExitResponse.cancel;
+    await _cleanUp();
     // macOS occasionally drops the termination after an asynchronous exit
     // approval (seen with Apple Event quits). Re-request it; if the app is
     // already exiting this never runs.
     if (_windowManaged) {
-      Timer(
-        const Duration(seconds: 2),
-        () => unawaited(windowManager.destroy()),
-      );
+      Timer(const Duration(seconds: 2), () => unawaited(_forceQuit()));
     }
     return AppExitResponse.exit;
   }
 
   @override
   Future<void> onWindowClose() async {
-    if (await _confirmExit()) await windowManager.destroy();
+    if (!await _confirmExit()) return;
+    // Hide right away so closing feels instant, even while cleaning up.
+    try {
+      await windowManager.hide();
+    } catch (_) {}
+    await _cleanUp();
+    await _forceQuit();
   }
 
-  /// Asks before discarding unsaved tabs, then flushes the log and closes the
-  /// database. Concurrent close/quit requests share one prompt.
+  /// Ends the process. `destroy` stops the message loop; if the process is
+  /// still around shortly after (seen on Windows), exit hard: the log and
+  /// database are already closed.
+  Future<void> _forceQuit() async {
+    Timer(const Duration(milliseconds: 1500), () => exit(0));
+    try {
+      await windowManager.destroy();
+    } catch (_) {
+      exit(0);
+    }
+  }
+
+  /// Asks before discarding unsaved tabs. Concurrent close/quit requests
+  /// share one prompt; once confirmed, later requests go straight through.
   Future<bool> _confirmExit() {
     if (_exitConfirmed) return Future.value(true);
     return _pendingExit ??= () async {
@@ -105,15 +123,19 @@ class _AppShellState extends ConsumerState<AppShell> with WindowListener {
           if (!ok) return false;
         }
         _exitConfirmed = true;
-        final logger = ref.read(loggerProvider)..info('Application closing');
-        await logger.close();
-        await ref.read(databaseProvider).close();
         return true;
       } finally {
         _pendingExit = null;
       }
     }();
   }
+
+  /// Flushes the log and closes the database, at most a few seconds.
+  Future<void> _cleanUp() => _cleanup ??= () async {
+    final logger = ref.read(loggerProvider)..info('Application closing');
+    final db = ref.read(databaseProvider);
+    await runShutdownSteps([logger.close, db.close]);
+  }();
 
   @override
   Widget build(BuildContext context) {

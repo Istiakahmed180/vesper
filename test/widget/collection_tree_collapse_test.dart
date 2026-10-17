@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart' show driftRuntimeOptions;
 import 'package:drift/native.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -8,6 +9,7 @@ import 'package:vesper/core/security/secret_vault.dart';
 import 'package:vesper/core/storage/app_database.dart';
 import 'package:vesper/core/theme/app_theme.dart';
 import 'package:vesper/features/api_client/domain/models/api_request.dart';
+import 'package:vesper/features/collections/domain/collection_models.dart';
 import 'package:vesper/features/collections/presentation/collection_tree_view.dart';
 import 'package:vesper/features/workspace/domain/workspace_models.dart';
 import 'package:vesper/features/workspace/presentation/workspace_controller.dart';
@@ -130,6 +132,58 @@ void main() {
     await tapRow('Cards API');
     await tapRow('Cards API');
     expect(find.text('Conversations'), findsOneWidget);
+
+    // A mouse click that moves a few pixels (common with a real mouse on
+    // Windows) is still a click, not a drag.
+    Future<void> shakyClick(String name) async {
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.text(name)),
+        kind: PointerDeviceKind.mouse,
+      );
+      await gesture.moveBy(const Offset(2, 1));
+      await gesture.moveBy(const Offset(1, 2));
+      await gesture.up();
+      await settle();
+    }
+
+    expect(find.text('Users'), findsOneWidget);
+    await shakyClick('Chat API');
+    expect(find.text('Users'), findsNothing, reason: 'collection collapses');
+    await shakyClick('Chat API');
+    expect(find.text('Users'), findsOneWidget, reason: 'collection expands');
+    await shakyClick('Conversations');
+    final open = find.text('List Conversations').evaluate().isNotEmpty;
+    await shakyClick('Conversations');
+    expect(
+      find.text('List Conversations').evaluate().isNotEmpty,
+      !open,
+      reason: 'folder toggles',
+    );
+
+    // A real drag (beyond a few pixels) still moves requests.
+    if (find.text('List Conversations').evaluate().isEmpty) {
+      await tapRow('Conversations');
+    }
+    final start = tester.getCenter(find.text('List Conversations'));
+    final drag = await tester.startGesture(
+      start,
+      kind: PointerDeviceKind.mouse,
+    );
+    final target = tester.getCenter(find.text('Users'));
+    for (var i = 1; i <= 10; i++) {
+      await drag.moveTo(Offset.lerp(start, target, i / 10)!);
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    await drag.up();
+    await settle();
+    final moved = await tester.runAsync(
+      () => container.read(collectionRepositoryProvider).watchTrees().first,
+    );
+    final chatTree = moved!.firstWhere((t) => t.collection.name == 'Chat API');
+    final users = chatTree.children.whereType<FolderNode>().firstWhere(
+      (f) => f.name == 'Users',
+    );
+    expect(users.children.map((n) => n.name), contains('List Conversations'));
 
     // Let the tab persistence timer finish.
     await tester.pump(const Duration(seconds: 5));
