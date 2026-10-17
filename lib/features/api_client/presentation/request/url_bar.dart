@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/platform_keys.dart';
+import '../../../../shared/widgets/dialogs.dart';
 import '../../../../shared/widgets/method_badge.dart';
 import '../../../../shared/widgets/variable_field.dart';
+import '../../../import_export/presentation/import_export_actions.dart';
 import '../../../workspace/presentation/response_controller.dart';
 import '../../../workspace/presentation/workspace_actions.dart';
 import '../../../workspace/presentation/workspace_controller.dart';
@@ -51,6 +53,23 @@ class _UrlBarState extends ConsumerState<UrlBar> {
     ref.read(workspaceProvider.notifier).setUrl(widget.tabId, value);
   }
 
+  /// Exports the saved request as JSON. Unsaved edits are not in the file,
+  /// so ask to save them first.
+  Future<void> _export(String requestId) async {
+    final tab = ref.read(requestTabProvider(widget.tabId));
+    if (tab == null) return;
+    if (tab.isDirty) {
+      showToast(
+        context,
+        'Save the request first (${PlatformKeys.combo('S')}) to export your '
+        'latest changes.',
+        error: true,
+      );
+      return;
+    }
+    await ImportExportActions(ref, context).exportRequest(requestId, tab.title);
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
@@ -68,6 +87,9 @@ class _UrlBarState extends ConsumerState<UrlBar> {
       responseProvider(widget.tabId).select((s) => s is ResponseLoading),
     );
     final actions = WorkspaceActions(ref, context);
+    final savedId = ref.watch(
+      requestTabProvider(widget.tabId).select((t) => t?.savedRequestId),
+    );
     ref.listen(focusUrlRequestProvider, (_, _) {
       _focus.requestFocus();
       final field = _focus.context
@@ -180,6 +202,12 @@ class _UrlBarState extends ConsumerState<UrlBar> {
                 leadingIcon: const Icon(Icons.copy_all_outlined, size: 16),
                 onPressed: () => actions.duplicateTab(widget.tabId),
                 child: const Text('Duplicate tab'),
+              ),
+              MenuItemButton(
+                key: const ValueKey('export-open-request'),
+                leadingIcon: const Icon(Icons.ios_share, size: 16),
+                onPressed: savedId == null ? null : () => _export(savedId),
+                child: const Text('Export request…'),
               ),
             ],
           ),

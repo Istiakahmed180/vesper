@@ -43,21 +43,16 @@ class WorkspaceController extends Notifier<WorkspaceState> {
     _parked.clear();
     _workspaceId = ref.read(activeWorkspaceIdProvider);
     ref.listen(activeWorkspaceIdProvider, (_, next) => _switchWorkspace(next));
-    ref.listen(collectionTreesProvider, (_, next) {
+    ref.listen(collectionTreesProvider, (prev, next) {
       // While rescoping to another workspace the provider still holds the
       // previous workspace's trees; syncing against them would unlink tabs.
       if (next.isLoading) return;
       final trees = next.value;
       if (trees != null) {
         _syncWithSavedRequests(trees);
-        final tab = state.activeTab;
-        if (tab is RequestTab) {
-          final reqId = tab.savedRequestId ?? tab.draft.id;
-          final ancestorIds = trees.ancestorIdsForRequest(reqId);
-          if (ancestorIds.isNotEmpty) {
-            ref.read(expandedNodesProvider.notifier).expand(ancestorIds);
-          }
-        }
+        // Restored tabs open before the trees load: reveal the active
+        // request once, when the trees first arrive.
+        if (prev?.value == null) _revealActiveRequest();
       }
     });
     ref.onDispose(() => _persistTimer?.cancel());
@@ -93,16 +88,6 @@ class WorkspaceController extends Notifier<WorkspaceState> {
     final tab = state.tab(tabId);
     if (tab != null) {
       _set(state.copyWith(activeTabId: () => tabId));
-      if (tab is RequestTab) {
-        final trees = ref.read(collectionTreesProvider).value;
-        if (trees != null) {
-          final reqId = tab.savedRequestId ?? tab.draft.id;
-          final ancestorIds = trees.ancestorIdsForRequest(reqId);
-          if (ancestorIds.isNotEmpty) {
-            ref.read(expandedNodesProvider.notifier).expand(ancestorIds);
-          }
-        }
-      }
     }
   }
 
@@ -298,7 +283,9 @@ class WorkspaceController extends Notifier<WorkspaceState> {
     final trees = ref.read(collectionTreesProvider).value ?? const [];
     if (saved.collectionId != null) {
       final loc = TreeLocation(saved.collectionId!, saved.folderId);
-      ref.read(expandedNodesProvider.notifier).expand(trees.ancestorIdsForLocation(loc));
+      ref
+          .read(expandedNodesProvider.notifier)
+          .expand(trees.ancestorIdsForLocation(loc));
     }
     return saved;
   }
@@ -397,19 +384,22 @@ class WorkspaceController extends Notifier<WorkspaceState> {
   }
 
   void _set(WorkspaceState next, {bool persist = true}) {
+    final switched = next.activeTabId != state.activeTabId;
     state = next;
     if (persist) _schedulePersist();
-    final tab = next.activeTab;
-    if (tab is RequestTab) {
-      final trees = ref.read(collectionTreesProvider).value;
-      if (trees != null) {
-        final reqId = tab.savedRequestId ?? tab.draft.id;
-        final ancestorIds = trees.ancestorIdsForRequest(reqId);
-        if (ancestorIds.isNotEmpty) {
-          ref.read(expandedNodesProvider.notifier).expand(ancestorIds);
-        }
-      }
-    }
+    // Only when another tab becomes active, so collapsing the folder of the
+    // open request (or editing it) does not reopen the folder.
+    if (switched) _revealActiveRequest();
+  }
+
+  /// Expands the collection and folders that contain the active request.
+  void _revealActiveRequest() {
+    final tab = state.activeTab;
+    if (tab is! RequestTab) return;
+    final trees = ref.read(collectionTreesProvider).value;
+    if (trees == null) return;
+    final ids = trees.ancestorIdsForRequest(tab.savedRequestId ?? tab.draft.id);
+    if (ids.isNotEmpty) ref.read(expandedNodesProvider.notifier).expand(ids);
   }
 
   /// Keeps open tabs consistent with renames/deletes made in the sidebar.

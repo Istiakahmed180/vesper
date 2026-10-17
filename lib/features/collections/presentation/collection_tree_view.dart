@@ -61,53 +61,12 @@ class _Row {
 class CollectionTreeView extends ConsumerWidget {
   const CollectionTreeView({super.key});
 
-  void _autoExpandActiveRequest(
-    WidgetRef ref,
-    RequestTab tab,
-    List<CollectionTree>? trees,
-  ) {
-    if (trees == null) return;
-    final reqId = tab.savedRequestId ?? tab.draft.id;
-    final ancestorIds = trees.ancestorIdsForRequest(reqId);
-    if (ancestorIds.isNotEmpty) {
-      final expanded = ref.read(expandedNodesProvider);
-      if (!expanded.containsAll(ancestorIds)) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          ref.read(expandedNodesProvider.notifier).expand(ancestorIds);
-        });
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final treesAsync = ref.watch(collectionTreesProvider);
     final filtered = ref.watch(filteredTreesProvider);
     final expanded = ref.watch(expandedNodesProvider);
     final searching = filtered != null;
-
-    final activeTab = ref.watch(workspaceProvider.select((s) => s.activeTab));
-    ref.listen<WorkspaceTab?>(workspaceProvider.select((s) => s.activeTab), (
-      previous,
-      next,
-    ) {
-      if (next is RequestTab) {
-        _autoExpandActiveRequest(ref, next, treesAsync.value);
-      }
-    });
-    ref.listen<AsyncValue<List<CollectionTree>>>(collectionTreesProvider, (
-      previous,
-      next,
-    ) {
-      final currentTab = ref.read(workspaceProvider.select((s) => s.activeTab));
-      if (currentTab is RequestTab && next.value != null) {
-        _autoExpandActiveRequest(ref, currentTab, next.value);
-      }
-    });
-
-    if (activeTab is RequestTab && treesAsync.value != null) {
-      _autoExpandActiveRequest(ref, activeTab, treesAsync.value);
-    }
 
     return treesAsync.when(
       loading: () => const Center(
@@ -239,7 +198,9 @@ Future<void> _addRequest(
   );
   if (saved == null) return;
   final trees = ref.read(collectionTreesProvider).value ?? const [];
-  ref.read(expandedNodesProvider.notifier).expand(trees.ancestorIdsForLocation(loc));
+  ref
+      .read(expandedNodesProvider.notifier)
+      .expand(trees.ancestorIdsForLocation(loc));
   await ref.read(workspaceProvider.notifier).openSavedRequest(saved.id);
 }
 
@@ -262,9 +223,11 @@ Future<void> _addFolder(
   );
   if (f != null) {
     final trees = ref.read(collectionTreesProvider).value ?? const [];
-    ref.read(expandedNodesProvider.notifier).expand(
-      trees.ancestorIdsForLocation(TreeLocation(loc.collectionId, f.id)),
-    );
+    ref
+        .read(expandedNodesProvider.notifier)
+        .expand(
+          trees.ancestorIdsForLocation(TreeLocation(loc.collectionId, f.id)),
+        );
   }
 }
 
@@ -383,7 +346,9 @@ class _CollectionRow extends ConsumerWidget {
             );
         }
         final trees = ref.read(collectionTreesProvider).value ?? const [];
-        ref.read(expandedNodesProvider.notifier).expand(trees.ancestorIdsForLocation(loc));
+        ref
+            .read(expandedNodesProvider.notifier)
+            .expand(trees.ancestorIdsForLocation(loc));
       },
       builder: (context, candidates, _) => Draggable<TreeDrag>(
         data: CollectionDrag(c, index),
@@ -594,7 +559,9 @@ class _FolderRow extends ConsumerWidget {
             break;
         }
         final trees = ref.read(collectionTreesProvider).value ?? const [];
-        ref.read(expandedNodesProvider.notifier).expand(trees.ancestorIdsForLocation(inside));
+        ref
+            .read(expandedNodesProvider.notifier)
+            .expand(trees.ancestorIdsForLocation(inside));
       },
       builder: (context, candidates, _) => Draggable<TreeDrag>(
         data: FolderDrag(f),
@@ -763,14 +730,12 @@ class _RequestRow extends ConsumerWidget {
         final loc = TreeLocation(r.collectionId!, r.folderId);
         await guarded(
           context,
-          () => repo.moveRequest(
-            dragged.id,
-            loc,
-            index: index,
-          ),
+          () => repo.moveRequest(dragged.id, loc, index: index),
         );
         final trees = ref.read(collectionTreesProvider).value ?? const [];
-        ref.read(expandedNodesProvider.notifier).expand(trees.ancestorIdsForLocation(loc));
+        ref
+            .read(expandedNodesProvider.notifier)
+            .expand(trees.ancestorIdsForLocation(loc));
       },
       builder: (context, candidates, _) => Draggable<TreeDrag>(
         data: RequestDrag(r),
