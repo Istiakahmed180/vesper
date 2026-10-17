@@ -288,7 +288,8 @@ class _BodyViewState extends State<_BodyView> {
   late BodyView _view = widget.response.contentKind == ResponseContentKind.image
       ? BodyView.preview
       : BodyView.pretty;
-  final Map<BodyView, Future<FormattedBody>> _cache = {};
+  late BodyFormat _format = detectBodyFormat(widget.response);
+  final Map<(BodyView, BodyFormat?), Future<FormattedBody>> _cache = {};
   CodeViewController? _controller;
   final _searchController = TextEditingController();
   final _searchFocus = FocusNode();
@@ -297,8 +298,14 @@ class _BodyViewState extends State<_BodyView> {
 
   ApiResponse get r => widget.response;
 
-  Future<FormattedBody> _formatted(BodyView view) => _cache[view] ??=
-      formatResponseBody(r, view == BodyView.preview ? BodyView.pretty : view);
+  Future<FormattedBody> _formatted(BodyView view) {
+    final v = view == BodyView.raw ? BodyView.raw : BodyView.pretty;
+    final format = v == BodyView.pretty ? _format : null;
+    return _cache[(v, format)] ??= formatResponseBody(r, v, format: format);
+  }
+
+  bool get _showsBase64 =>
+      _view == BodyView.pretty && _format == BodyFormat.base64;
 
   @override
   void dispose() {
@@ -310,7 +317,7 @@ class _BodyViewState extends State<_BodyView> {
   }
 
   Future<void> _copy() async {
-    final text = r.isTextual
+    final text = r.isTextual || _showsBase64
         ? (await _formatted(
             _view == BodyView.raw ? BodyView.raw : BodyView.pretty,
           )).text
@@ -411,6 +418,13 @@ class _BodyViewState extends State<_BodyView> {
                       },
                       onChanged: (v) => setState(() => _view = v),
                     ),
+                  if (_view == BodyView.pretty) ...[
+                    const SizedBox(width: 8),
+                    _FormatPicker(
+                      format: _format,
+                      onChanged: (f) => setState(() => _format = f),
+                    ),
+                  ],
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
@@ -434,7 +448,7 @@ class _BodyViewState extends State<_BodyView> {
                       icon: const Icon(Icons.unfold_more),
                     ),
                   ],
-                  if (r.isTextual)
+                  if (r.isTextual || _showsBase64)
                     IconButton(
                       tooltip: 'Search (${PlatformKeys.combo('F')})',
                       onPressed: _toggleSearch,
@@ -564,14 +578,27 @@ class _BodyViewState extends State<_BodyView> {
         ),
       );
     }
-    if (!r.isTextual) {
+    if (!r.isTextual && !_showsBase64) {
       return EmptyState(
         icon: Icons.insert_drive_file_outlined,
         title: 'Binary response (${Formatters.bytes(r.bodySize)})',
         message: 'Save the response to a file to inspect it.',
-        action: OutlinedButton(
-          onPressed: _save,
-          child: const Text('Save to file'),
+        action: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            OutlinedButton(
+              onPressed: _save,
+              child: const Text('Save to file'),
+            ),
+            const SizedBox(width: 8),
+            TextButton(
+              onPressed: () => setState(() {
+                _view = BodyView.pretty;
+                _format = BodyFormat.base64;
+              }),
+              child: const Text('View as Base64'),
+            ),
+          ],
         ),
       );
     }
@@ -699,6 +726,57 @@ class _KeyValueList extends StatelessWidget {
           );
         },
       ),
+    );
+  }
+}
+
+/// Compact menu choosing how the Pretty view renders the body.
+class _FormatPicker extends StatelessWidget {
+  const _FormatPicker({required this.format, required this.onChanged});
+  final BodyFormat format;
+  final ValueChanged<BodyFormat> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return MenuAnchor(
+      builder: (context, controller, _) => InkWell(
+        onTap: () => controller.isOpen ? controller.close() : controller.open(),
+        borderRadius: BorderRadius.circular(6),
+        child: Container(
+          height: 26,
+          padding: const EdgeInsets.only(left: 10, right: 6),
+          decoration: BoxDecoration(
+            color: colors.canvas,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: colors.border),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                format.label,
+                style: TextStyle(fontSize: 12, color: colors.textPrimary),
+              ),
+              const SizedBox(width: 2),
+              Icon(Icons.expand_more, size: 16, color: colors.textMuted),
+            ],
+          ),
+        ),
+      ),
+      menuChildren: [
+        for (final f in BodyFormat.values)
+          MenuItemButton(
+            onPressed: () => onChanged(f),
+            child: Text(
+              f.label,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: f == format ? FontWeight.w600 : FontWeight.w400,
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

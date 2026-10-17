@@ -10,6 +10,49 @@ enum CodeLanguage { json, xml, html, text }
 
 enum BodyView { pretty, raw, preview }
 
+/// How the Pretty view renders the body; defaults to [detectBodyFormat].
+enum BodyFormat {
+  json('JSON'),
+  xml('XML'),
+  html('HTML'),
+  text('Text'),
+  base64('Base64');
+
+  const BodyFormat(this.label);
+  final String label;
+}
+
+/// Picks a format from the content type, sniffing untyped text bodies.
+BodyFormat detectBodyFormat(ApiResponse response) {
+  switch (response.contentKind) {
+    case ResponseContentKind.json:
+      return BodyFormat.json;
+    case ResponseContentKind.xml:
+      return BodyFormat.xml;
+    case ResponseContentKind.html:
+      return BodyFormat.html;
+    case ResponseContentKind.image:
+      return BodyFormat.base64;
+    case ResponseContentKind.binary:
+      return BodyFormat.text;
+    case ResponseContentKind.text:
+      final bytes = response.bodyBytes;
+      final head = utf8
+          .decode(
+            bytes.length > 256 ? bytes.sublist(0, 256) : bytes,
+            allowMalformed: true,
+          )
+          .trimLeft()
+          .toLowerCase();
+      if (head.startsWith('{') || head.startsWith('[')) return BodyFormat.json;
+      if (head.startsWith('<!doctype html') || head.startsWith('<html')) {
+        return BodyFormat.html;
+      }
+      if (head.startsWith('<')) return BodyFormat.xml;
+      return BodyFormat.text;
+  }
+}
+
 /// Body text split into lines, plus fold ranges for the code viewer.
 @immutable
 class FormattedBody {
@@ -42,15 +85,28 @@ class FormattedBody {
 }
 
 class _FormatJob {
-  const _FormatJob(this.bytes, this.kind, this.view, this.charset);
+  const _FormatJob(
+    this.bytes,
+    this.kind,
+    this.view,
+    this.charset, [
+    this.format,
+  ]);
   final Uint8List bytes;
   final ResponseContentKind kind;
   final BodyView view;
   final String? charset;
+
+  /// Overrides [kind] in the Pretty view.
+  final BodyFormat? format;
 }
 
 /// Formats a response body off the UI isolate for anything non-trivial.
-Future<FormattedBody> formatResponseBody(ApiResponse response, BodyView view) {
+Future<FormattedBody> formatResponseBody(
+  ApiResponse response,
+  BodyView view, {
+  BodyFormat? format,
+}) {
   final charset = RegExp(
     r'charset=([^;]+)',
     caseSensitive: false,
@@ -60,6 +116,7 @@ Future<FormattedBody> formatResponseBody(ApiResponse response, BodyView view) {
     response.contentKind,
     view,
     charset,
+    format,
   );
   if (response.bodySize < 32 * 1024) return Future.value(_format(job));
   return Isolate.run(() => _format(job));
@@ -84,14 +141,33 @@ FormattedBody formatText(
 }
 
 FormattedBody _format(_FormatJob job) {
+  if (job.view != BodyView.raw && job.format == BodyFormat.base64) {
+    if (job.bytes.length > AppConstants.maxPrettyBytes) {
+      return _fromText(
+        '',
+        CodeLanguage.text,
+        fold: false,
+        notice:
+            'Body is larger than ${AppConstants.maxPrettyBytes ~/ (1024 * 1024)} MB; '
+            'save it to a file instead.',
+      );
+    }
+    return _fromText(base64Encode(job.bytes), CodeLanguage.text, fold: false);
+  }
   final text = job.charset == 'iso-8859-1' || job.charset == 'latin1'
       ? latin1.decode(job.bytes, allowInvalid: true)
       : utf8.decode(job.bytes, allowMalformed: true);
-  final language = switch (job.kind) {
-    ResponseContentKind.json => CodeLanguage.json,
-    ResponseContentKind.xml => CodeLanguage.xml,
-    ResponseContentKind.html => CodeLanguage.html,
-    _ => CodeLanguage.text,
+  final language = switch (job.format) {
+    BodyFormat.json => CodeLanguage.json,
+    BodyFormat.xml => CodeLanguage.xml,
+    BodyFormat.html => CodeLanguage.html,
+    BodyFormat.text || BodyFormat.base64 => CodeLanguage.text,
+    null => switch (job.kind) {
+      ResponseContentKind.json => CodeLanguage.json,
+      ResponseContentKind.xml => CodeLanguage.xml,
+      ResponseContentKind.html => CodeLanguage.html,
+      _ => CodeLanguage.text,
+    },
   };
 
   if (job.view == BodyView.raw) {
