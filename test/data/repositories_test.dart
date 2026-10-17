@@ -241,6 +241,104 @@ void main() {
       );
     });
 
+    test('exports a single request with the collection settings', () async {
+      final c = await repo.createCollection('API');
+      await repo.saveSettings(
+        c.id,
+        const CollectionSettings(auth: BearerAuth(token: '{{token}}')),
+      );
+      final req = await repo.saveRequest(
+        ApiRequest(
+          name: 'Me',
+          url: '{{base_url}}/me',
+          collectionId: c.id,
+          auth: const BearerAuth(token: 'secret'),
+        ),
+      );
+      await repo.saveRequest(ApiRequest(name: 'Other', collectionId: c.id));
+
+      final doc = await repo.exportRequest(req.id);
+      expect(doc.name, 'Me');
+      final exported = (doc.items.single as RequestItem).request;
+      expect(exported.url, '{{base_url}}/me');
+      // Secrets are left out unless asked for.
+      expect(exported.auth, const BearerAuth());
+      expect(doc.settings.auth, const BearerAuth());
+      final full = await repo.exportRequest(req.id, includeSecrets: true);
+      expect(
+        (full.items.single as RequestItem).request.auth,
+        const BearerAuth(token: 'secret'),
+      );
+      expect(full.settings.auth, const BearerAuth(token: '{{token}}'));
+
+      await expectLater(
+        repo.exportRequest('missing'),
+        throwsA(isA<StorageFailure>()),
+      );
+    });
+
+    test('imports into a folder', () async {
+      final c = await repo.createCollection('API');
+      final users = await repo.createFolder(c.id, 'Users');
+      await repo.saveRequest(
+        ApiRequest(name: 'List', collectionId: c.id, folderId: users.id),
+      );
+      await repo.importIntoCollection(
+        c.id,
+        CollectionDocument(
+          name: 'Profile',
+          items: [RequestItem(ApiRequest(name: 'Profile'))],
+        ),
+        folderId: users.id,
+      );
+      final tree = (await repo.watchTrees().first).firstWhere(
+        (t) => t.collection.id == c.id,
+      );
+      final folder = tree.children.whereType<FolderNode>().single;
+      expect(
+        folder.children.whereType<RequestNode>().map((n) => n.request.name),
+        ['List', 'Profile'],
+      );
+    });
+
+    test('replaceRequest overwrites content and keeps its place', () async {
+      final c = await repo.createCollection('API');
+      final users = await repo.createFolder(c.id, 'Users');
+      final original = await repo.saveRequest(
+        ApiRequest(
+          name: 'Old',
+          url: 'https://old.test',
+          collectionId: c.id,
+          folderId: users.id,
+          auth: const BearerAuth(token: 'old-secret'),
+        ),
+      );
+
+      final saved = await repo.replaceRequest(
+        original.id,
+        ApiRequest(
+          name: 'New',
+          method: HttpMethod.post,
+          url: 'https://new.test',
+        ),
+      );
+      expect(saved.id, original.id);
+      final reloaded = (await repo.getRequest(original.id))!;
+      expect(reloaded.name, 'New');
+      expect(reloaded.method, HttpMethod.post);
+      expect(reloaded.url, 'https://new.test');
+      expect(reloaded.collectionId, c.id);
+      expect(reloaded.folderId, users.id);
+      expect(reloaded.sortOrder, original.sortOrder);
+      // The old secret does not linger in the vault.
+      expect(reloaded.auth, isNot(const BearerAuth(token: 'old-secret')));
+
+      await expectLater(
+        repo.replaceRequest('missing', ApiRequest(name: 'X')),
+        throwsA(isA<StorageFailure>()),
+      );
+    });
+
     test('replaceCollection swaps contents', () async {
       final c = await repo.createCollection('API');
       await repo.saveRequest(ApiRequest(name: 'old', collectionId: c.id));

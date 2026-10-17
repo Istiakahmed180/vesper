@@ -648,6 +648,15 @@ class _FolderRow extends ConsumerWidget {
                   ImportExportActions(ref, context).exportFolder(f.id, f.name),
               child: const Text('Export…'),
             ),
+            MenuItemButton(
+              key: const ValueKey('folder-import'),
+              leadingIcon: const Icon(Icons.file_download_outlined, size: 16),
+              onPressed: () => ImportExportActions(
+                ref,
+                context,
+              ).importIntoCollection(f.collectionId, f.name, folderId: f.id),
+              child: const Text('Import…'),
+            ),
             const Divider(),
             if (node.children.isNotEmpty)
               MenuItemButton(
@@ -803,6 +812,27 @@ class _RequestRow extends ConsumerWidget {
                     success: 'Request duplicated',
                   ),
                   child: const Text('Duplicate'),
+                ),
+                MenuItemButton(
+                  key: const ValueKey('request-export'),
+                  leadingIcon: const Icon(Icons.ios_share, size: 16),
+                  onPressed: () => ImportExportActions(
+                    ref,
+                    context,
+                  ).exportRequest(r.id, r.name),
+                  child: const Text('Export…'),
+                ),
+                MenuItemButton(
+                  key: const ValueKey('request-replace'),
+                  leadingIcon: const Icon(
+                    Icons.file_download_outlined,
+                    size: 16,
+                  ),
+                  onPressed: () => ImportExportActions(
+                    ref,
+                    context,
+                  ).replaceRequest(r.id, r.name),
+                  child: const Text('Replace from file…'),
                 ),
                 const Divider(),
                 MenuItemButton(

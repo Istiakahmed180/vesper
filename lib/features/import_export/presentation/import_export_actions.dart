@@ -10,9 +10,12 @@ import '../../../core/errors/app_failure.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../shared/widgets/dialogs.dart';
+import '../../api_client/domain/models/api_request.dart';
+import '../../collections/domain/collection_models.dart';
 import '../../collections/domain/collection_repository.dart';
 import '../../collections/presentation/collection_providers.dart';
 import '../../environments/domain/environment_models.dart';
+import '../../workspace/presentation/workspace_controller.dart';
 import '../domain/collection_codec.dart';
 import '../domain/import_service.dart';
 
@@ -139,26 +142,37 @@ class ImportExportActions {
   }
 
   /// Imports one or more collection files and appends their folders and
-  /// requests to the existing collection [collectionId].
+  /// requests to the existing collection [collectionId], or to its folder
+  /// [folderId] when given. [targetName] names the collection or folder.
   Future<void> importIntoCollection(
     String collectionId,
-    String collectionName,
-  ) async {
-    final files = await _pickJsonFiles('Import into "$collectionName"');
+    String targetName, {
+    String? folderId,
+  }) async {
+    final files = await _pickJsonFiles('Import into "$targetName"');
     await _importFiles(
       files,
       (doc) => ref
           .read(collectionRepositoryProvider)
-          .importIntoCollection(collectionId, doc),
-      single: (_, counts) => 'Imported $counts into "$collectionName"',
-      many: (n, counts) => 'Imported $n files into "$collectionName": $counts',
+          .importIntoCollection(collectionId, doc, folderId: folderId),
+      single: (_, counts) => 'Imported $counts into "$targetName"',
+      many: (n, counts) => 'Imported $n files into "$targetName": $counts',
       extraNotes: (doc) => [
         if (!doc.settings.isEmpty)
           'Collection authorization and variables from the file were not '
-              'imported; "$collectionName" keeps its own.',
+              'imported; the collection keeps its own.',
       ],
     );
-    ref.read(expandedNodesProvider.notifier).expand([collectionId]);
+    final trees = ref.read(collectionTreesProvider).value ?? const [];
+    ref
+        .read(expandedNodesProvider.notifier)
+        .expand(
+          folderId == null
+              ? [collectionId]
+              : trees.ancestorIdsForLocation(
+                  TreeLocation(collectionId, folderId),
+                ),
+        );
   }
 
   /// "12 requests, 3 folders" for the items of an imported collection.
@@ -237,6 +251,79 @@ class ImportExportActions {
       if (context.mounted) showToast(context, e.userMessage, error: true);
     }
   }
+
+  /// Exports only the request [id], plus the collection's auth and
+  /// variables so inherited auth keeps working.
+  Future<void> exportRequest(String id, String name) async {
+    final includeSecrets = await _askIncludeSecrets('request');
+    if (includeSecrets == null) return;
+    try {
+      final doc = await ref
+          .read(collectionRepositoryProvider)
+          .exportRequest(id, includeSecrets: includeSecrets);
+      final json = const VesperCollectionCodec().encode(
+        doc,
+        includeSecrets: includeSecrets,
+      );
+      await _save('${Formatters.slug(name)}.vesper.json', json);
+    } catch (e) {
+      if (context.mounted) showToast(context, e.userMessage, error: true);
+    }
+  }
+
+  /// Replaces the saved request [id] with the first request in a picked
+  /// file, keeping its place in the tree. Open tabs show the new content.
+  Future<void> replaceRequest(String id, String name) async {
+    try {
+      final text = await _pickJson('Replace "$name"');
+      if (text == null) return;
+      final result = ref
+          .read(importServiceProvider)
+          .parseCollection(await ImportService.decode(text));
+      final requests = _requests(result.value.items);
+      if (requests.isEmpty) {
+        throw const ImportFailure('The file does not contain a request.');
+      }
+      final source = requests.first;
+      if (!context.mounted) return;
+      final ok = await confirmDialog(
+        context,
+        title: 'Replace request',
+        message:
+            'Replace "$name" with "${source.name}" from the file? Unsaved '
+            'changes in its open tab are discarded. This cannot be undone.',
+        confirmLabel: 'Replace',
+      );
+      if (!ok) return;
+      final saved = await ref
+          .read(collectionRepositoryProvider)
+          .replaceRequest(id, source);
+      ref.read(workspaceProvider.notifier).reloadSavedRequest(saved);
+      if (!context.mounted) return;
+      showToast(context, 'Replaced "$name" (${result.source})');
+      final notes = [
+        if (requests.length > 1)
+          'The file has ${requests.length} requests; only the first, '
+              '"${source.name}", was used.',
+        if (!result.value.settings.isEmpty)
+          'Collection authorization and variables from the file were not '
+              'imported; the collection keeps its own.',
+        ...result.warnings,
+      ];
+      if (notes.isNotEmpty) await _showWarnings(notes);
+    } catch (e) {
+      if (context.mounted) showToast(context, e.userMessage, error: true);
+    }
+  }
+
+  /// All requests in [items], depth first.
+  static List<ApiRequest> _requests(List<CollectionItem> items) => [
+    for (final i in items)
+      ...switch (i) {
+        FolderItem(:final items) => _requests(items),
+        RequestItem(:final request) => [request],
+      },
+  ];
 
   Future<void> exportEnvironment(Environment env) async {
     final hasSecrets = env.variables.any((v) => v.isSecret);

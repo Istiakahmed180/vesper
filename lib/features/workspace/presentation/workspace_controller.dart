@@ -142,6 +142,18 @@ class WorkspaceController extends Notifier<WorkspaceState> {
     }
   }
 
+  /// Swaps open tabs of [request] for fresh ones showing its saved content,
+  /// e.g. after it was replaced from a file. Unsaved edits are dropped.
+  void reloadSavedRequest(ApiRequest request) {
+    final synced = _syncParams(request);
+    for (final tab in [...state.tabs]) {
+      if (tab is RequestTab && tab.savedRequestId == request.id) {
+        _replaceTab(tab.id, RequestTab(draft: synced, baseline: synced));
+        ref.invalidate(responseProvider(tab.id));
+      }
+    }
+  }
+
   void openEnvironment(String environmentId, String name) {
     final existing = state.tabs
         .whereType<EnvironmentTab>()

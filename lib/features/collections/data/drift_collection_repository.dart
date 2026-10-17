@@ -595,6 +595,23 @@ class DriftCollectionRepository implements CollectionRepository {
   }
 
   @override
+  Future<ApiRequest> replaceRequest(String id, ApiRequest source) async {
+    final existing = await getRequest(id);
+    if (existing == null) {
+      throw const StorageFailure('The request no longer exists.');
+    }
+    return saveRequest(
+      source.copyWith(
+        id: id,
+        collectionId: () => existing.collectionId,
+        folderId: () => existing.folderId,
+        sortOrder: existing.sortOrder,
+        createdAt: existing.createdAt,
+      ),
+    );
+  }
+
+  @override
   Future<void> moveRequest(String id, TreeLocation target, {int? index}) =>
       _db.transaction(() async {
         await (_db.update(_db.requests)..where((r) => r.id.equals(id))).write(
@@ -620,7 +637,6 @@ class DriftCollectionRepository implements CollectionRepository {
     if (tree == null) {
       throw const StorageFailure('The collection no longer exists.');
     }
-    final settings = await getSettings(id) ?? const CollectionSettings();
     return CollectionDocument(
       name: tree.collection.name,
       description: tree.collection.description,
@@ -628,15 +644,23 @@ class DriftCollectionRepository implements CollectionRepository {
         tree.children,
         includeSecrets: includeSecrets,
       ),
-      settings: includeSecrets
-          ? settings
-          : CollectionSettings(
-              auth: settings.auth.withoutSecrets,
-              variables: [
-                for (final v in settings.variables)
-                  v.isSecret ? v.copyWith(value: '') : v,
-              ],
-            ),
+      settings: await _exportSettings(id, includeSecrets: includeSecrets),
+    );
+  }
+
+  Future<CollectionSettings> _exportSettings(
+    String collectionId, {
+    required bool includeSecrets,
+  }) async {
+    final settings =
+        await getSettings(collectionId) ?? const CollectionSettings();
+    if (includeSecrets) return settings;
+    return CollectionSettings(
+      auth: settings.auth.withoutSecrets,
+      variables: [
+        for (final v in settings.variables)
+          v.isSecret ? v.copyWith(value: '') : v,
+      ],
     );
   }
 
@@ -653,10 +677,6 @@ class DriftCollectionRepository implements CollectionRepository {
     }
     // The collection's auth and variables come along, so requests that
     // inherit them keep working after an import.
-    final collection = await exportCollection(
-      folder.collectionId,
-      includeSecrets: includeSecrets,
-    );
     final node = await _folderNode(folder);
     return CollectionDocument(
       name: folder.name,
@@ -664,7 +684,35 @@ class DriftCollectionRepository implements CollectionRepository {
         node.children,
         includeSecrets: includeSecrets,
       ),
-      settings: collection.settings,
+      settings: await _exportSettings(
+        folder.collectionId,
+        includeSecrets: includeSecrets,
+      ),
+    );
+  }
+
+  @override
+  Future<CollectionDocument> exportRequest(
+    String id, {
+    bool includeSecrets = false,
+  }) async {
+    final request = await getRequest(id);
+    if (request == null) {
+      throw const StorageFailure('The request no longer exists.');
+    }
+    return CollectionDocument(
+      name: request.name,
+      items: [
+        RequestItem(
+          includeSecrets
+              ? request
+              : request.copyWith(auth: request.auth.withoutSecrets),
+        ),
+      ],
+      settings: await _exportSettings(
+        request.collectionId!,
+        includeSecrets: includeSecrets,
+      ),
     );
   }
 
@@ -709,11 +757,12 @@ class DriftCollectionRepository implements CollectionRepository {
   @override
   Future<void> importIntoCollection(
     String id,
-    CollectionDocument document,
-  ) async {
+    CollectionDocument document, {
+    String? folderId,
+  }) async {
     await _db.transaction(() async {
-      final start = await _nextSortInLocation(TreeLocation(id));
-      await _insertItems(document.items, id, null, startOrder: start);
+      final start = await _nextSortInLocation(TreeLocation(id, folderId));
+      await _insertItems(document.items, id, folderId, startOrder: start);
     });
     await _touchCollection(id);
   }

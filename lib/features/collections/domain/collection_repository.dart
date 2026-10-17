@@ -75,6 +75,10 @@ abstract class CollectionRepository {
   Future<void> renameRequest(String id, String name);
   Future<void> deleteRequest(String id);
   Future<ApiRequest> duplicateRequest(String id);
+
+  /// Overwrites the saved request [id] with the content of [source] (name
+  /// included) while keeping its id and place in the tree.
+  Future<ApiRequest> replaceRequest(String id, ApiRequest source);
   Future<void> moveRequest(String id, TreeLocation target, {int? index});
 
   /// Exports a collection including secrets only when [includeSecrets].
@@ -90,12 +94,24 @@ abstract class CollectionRepository {
     bool includeSecrets = false,
   });
 
+  /// Exports one request as a collection document named after the request,
+  /// with the collection's auth and variables.
+  Future<CollectionDocument> exportRequest(
+    String id, {
+    bool includeSecrets = false,
+  });
+
   /// Creates a new collection from [document] and returns its id.
   Future<String> importCollection(CollectionDocument document);
 
-  /// Appends the items of [document] to the root of an existing collection.
-  /// The collection's name, description and settings are left unchanged.
-  Future<void> importIntoCollection(String id, CollectionDocument document);
+  /// Appends the items of [document] to an existing collection, at its root
+  /// or inside [folderId]. The collection's name, description and settings
+  /// are left unchanged.
+  Future<void> importIntoCollection(
+    String id,
+    CollectionDocument document, {
+    String? folderId,
+  });
 
   /// Replaces the contents of an existing collection (used by sync pull).
   Future<void> replaceCollection(String id, CollectionDocument document);
