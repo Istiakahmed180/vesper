@@ -96,8 +96,17 @@ class UpdateController extends Notifier<UpdateState> {
   static const firstCheckDelay = Duration(seconds: 20);
   static const checkInterval = Duration(hours: 6);
 
+  /// Wait after a failed background check (offline at startup, rate limit).
+  static const retryDelay = Duration(minutes: 5);
+
+  /// How often the schedule is compared with the wall clock. Timers do not
+  /// advance while the computer sleeps, so a single 6-hour timer could take
+  /// days to fire.
+  static const _tick = Duration(minutes: 1);
+
   Timer? _first;
-  Timer? _periodic;
+  Timer? _ticker;
+  DateTime? _nextCheck;
   CancelToken? _download;
 
   @override
@@ -107,14 +116,21 @@ class UpdateController extends Notifier<UpdateState> {
         ref.watch(autoUpdateSupportedProvider) &&
         ref.watch(updateServiceProvider) != null;
     if (auto) {
-      _first = Timer(firstCheckDelay, () => unawaited(check()));
-      _periodic = Timer.periodic(checkInterval, (_) => unawaited(check()));
+      _nextCheck ??= DateTime.now().add(firstCheckDelay);
+      _ticker = Timer.periodic(_tick, (_) => _checkIfDue());
+      _first = Timer(firstCheckDelay, _checkIfDue);
     }
     ref.onDispose(() {
       _first?.cancel();
-      _periodic?.cancel();
+      _ticker?.cancel();
     });
     return stateOrNull ?? const UpdateState();
+  }
+
+  void _checkIfDue() {
+    final next = _nextCheck;
+    if (!ref.mounted || next == null || DateTime.now().isBefore(next)) return;
+    unawaited(check());
   }
 
   /// Looks for a newer release. Background checks fail silently; [manual]
@@ -123,9 +139,13 @@ class UpdateController extends Notifier<UpdateState> {
     final service = ref.read(updateServiceProvider);
     if (service == null || state.busy) return;
     final previous = state;
+    // Set before awaiting so the ticker does not start a second check.
+    _nextCheck = DateTime.now().add(retryDelay);
     state = state.copyWith(phase: UpdatePhase.checking);
     try {
       final release = await service.latest();
+      _nextCheck = DateTime.now().add(checkInterval);
+      if (!ref.mounted) return;
       if (release != null &&
           release.isNewerThan(ref.read(currentVersionProvider))) {
         final same = previous.release?.version == release.version;
@@ -139,6 +159,7 @@ class UpdateController extends Notifier<UpdateState> {
         state = const UpdateState(phase: UpdatePhase.upToDate);
       }
     } catch (e) {
+      if (!ref.mounted) return;
       ref.read(loggerProvider).warning('Update check failed', {'error': '$e'});
       state = manual
           ? previous.copyWith(phase: UpdatePhase.failed, error: e.userMessage)

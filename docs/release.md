@@ -57,7 +57,7 @@ Runtime requirements: Windows 10 1809+ x64 and the Visual C++ Redistributable, w
 
 ## Publishing an update
 
-Installed apps check `https://api.github.com/repos/Istiakahmed180/vesper/releases/latest` 20 seconds after launch and every 6 hours (Settings → General → Updates; off in debug builds). When the published version is newer, a bar at the top offers **Update & restart**:
+Installed apps check `https://api.github.com/repos/Istiakahmed180/vesper/releases/latest` 20 seconds after launch and every 6 hours, retrying after 5 minutes when a check fails (Settings → General → Updates; off in debug builds). When the published version is newer, a bar at the top offers **Update & restart**:
 
 - **macOS:** downloads the DMG, copies `Vesper.app` out of it and, once Vesper has quit, swaps it in place of the running bundle (the old one is restored if the copy fails), clears the quarantine flag and reopens Vesper. If the folder is not writable, the DMG is opened instead.
 - **Windows:** downloads `Vesper-Setup-<version>.exe` and runs it with `/VERYSILENT /CLOSEAPPLICATIONS /RELAUNCH=1`; Windows asks for administrator permission once (UAC) and Vesper reopens afterwards.
