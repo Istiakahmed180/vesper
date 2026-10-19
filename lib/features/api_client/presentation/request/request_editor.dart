@@ -419,6 +419,7 @@ class _ParamsSection extends ConsumerWidget {
         rows: params,
         bulkSeparator: '=',
         keyHint: 'Parameter',
+        showDescription: true,
         onChanged: (rows) =>
             ref.read(workspaceProvider.notifier).setParams(tabId, rows),
       ),

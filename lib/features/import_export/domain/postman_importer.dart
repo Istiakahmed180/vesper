@@ -199,6 +199,7 @@ class PostmanCollectionImporter implements CollectionImporter {
                 key: counter.text(f['key']),
                 value: counter.text(f['value']),
                 enabled: !f.boolean('disabled'),
+                description: _description(f['description']),
               ),
           ],
         );
@@ -213,12 +214,14 @@ class PostmanCollectionImporter implements CollectionImporter {
                       kind: FormFieldKind.file,
                       filePath: f['src'] is String ? f.str('src') : null,
                       contentType: f.str('contentType'),
+                      description: _description(f['description']),
                       enabled: !f.boolean('disabled'),
                     )
                   : FormDataField(
                       key: counter.text(f['key']),
                       value: counter.text(f['value']),
                       contentType: f.str('contentType'),
+                      description: _description(f['description']),
                       enabled: !f.boolean('disabled'),
                     ),
           ],

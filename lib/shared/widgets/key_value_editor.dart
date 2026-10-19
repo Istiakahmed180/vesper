@@ -20,6 +20,7 @@ class KeyValueEditor extends StatefulWidget {
     required this.onChanged,
     this.keyHint = 'Key',
     this.valueHint = 'Value',
+    this.showDescription = false,
     this.maskSensitive = false,
     this.bulkSeparator = ':',
     this.keySuggestions,
@@ -31,6 +32,10 @@ class KeyValueEditor extends StatefulWidget {
   final ValueChanged<List<KeyValue>> onChanged;
   final String keyHint;
   final String valueHint;
+
+  /// Shows a description column after the value.
+  final bool showDescription;
+
   final bool maskSensitive;
 
   /// Separator used in bulk edit ("key: value" for headers, "key=value" else).
@@ -160,6 +165,7 @@ class _KeyValueEditorState extends State<KeyValueEditor> {
           _HeaderRow(
             keyHint: widget.keyHint,
             valueHint: widget.valueHint,
+            showDescription: widget.showDescription,
             leading: AllRowsCheckbox(
               total: widget.rows.length,
               enabled: widget.rows.where((r) => r.enabled).length,
@@ -174,6 +180,7 @@ class _KeyValueEditorState extends State<KeyValueEditor> {
               row: row,
               keyHint: widget.keyHint,
               valueHint: widget.valueHint,
+              showDescription: widget.showDescription,
               obscure:
                   widget.maskSensitive &&
                   !_revealed.contains(row.id) &&
@@ -199,6 +206,7 @@ class _KeyValueEditorState extends State<KeyValueEditor> {
             row: KeyValue(id: _ghostId),
             keyHint: widget.keyHint,
             valueHint: widget.valueHint,
+            showDescription: widget.showDescription,
             ghost: true,
             keySuggestions: widget.keySuggestions,
             valueSuggestions: widget.valueSuggestions,
@@ -216,10 +224,12 @@ class _HeaderRow extends StatelessWidget {
   const _HeaderRow({
     required this.keyHint,
     required this.valueHint,
+    required this.showDescription,
     required this.leading,
   });
   final String keyHint;
   final String valueHint;
+  final bool showDescription;
   final Widget leading;
 
   @override
@@ -238,6 +248,11 @@ class _HeaderRow extends StatelessWidget {
           SizedBox(width: 40, child: leading),
           Expanded(flex: 2, child: Text(keyHint.toUpperCase(), style: style)),
           Expanded(flex: 3, child: Text(valueHint.toUpperCase(), style: style)),
+          if (showDescription)
+            Expanded(
+              flex: 2,
+              child: Text('DESCRIPTION', style: style),
+            ),
           const SizedBox(width: 64),
         ],
       ),
@@ -252,6 +267,7 @@ class _KeyValueRow extends StatefulWidget {
     required this.onChanged,
     required this.keyHint,
     required this.valueHint,
+    this.showDescription = false,
     this.onRemove,
     this.ghost = false,
     this.obscure = false,
@@ -271,6 +287,7 @@ class _KeyValueRow extends StatefulWidget {
   final VoidCallback? onRemove;
   final String keyHint;
   final String valueHint;
+  final bool showDescription;
   final bool ghost;
   final bool obscure;
   final VoidCallback? onReveal;
@@ -342,6 +359,23 @@ class _KeyValueRowState extends State<_KeyValueRow> {
                   onChanged: (v) => widget.onChanged(row.copyWith(value: v)),
                 ),
               ),
+              if (widget.showDescription) ...[
+                Container(
+                  width: 1,
+                  height: 30,
+                  color: colors.border.withValues(alpha: 0.6),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: VariableField(
+                    value: row.description,
+                    hint: 'Description',
+                    borderless: true,
+                    onChanged: (v) =>
+                        widget.onChanged(row.copyWith(description: v)),
+                  ),
+                ),
+              ],
               if (widget.fakeData)
                 FakeDataButton(
                   onPicked: (token) => widget.onChanged(

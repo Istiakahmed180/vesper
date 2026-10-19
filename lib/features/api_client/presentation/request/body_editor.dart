@@ -383,6 +383,13 @@ class _FormDataEditorState extends State<_FormDataEditor> {
                   style: Theme.of(context).textTheme.labelSmall,
                 ),
               ),
+              Expanded(
+                flex: 2,
+                child: Text(
+                  'DESCRIPTION',
+                  style: Theme.of(context).textTheme.labelSmall,
+                ),
+              ),
               const SizedBox(width: 36),
             ],
           ),
@@ -537,6 +544,15 @@ class _FormDataRow extends StatelessWidget {
                         ],
                       ),
                     ),
+            ),
+            Expanded(
+              flex: 2,
+              child: VariableField(
+                value: field.description,
+                hint: 'Description',
+                borderless: true,
+                onChanged: (v) => onChanged(field.copyWith(description: v)),
+              ),
             ),
             SizedBox(
               width: 36,

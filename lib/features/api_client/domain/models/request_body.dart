@@ -46,6 +46,7 @@ class FormDataField {
     this.kind = FormFieldKind.text,
     this.filePath,
     this.contentType = '',
+    this.description = '',
     this.enabled = true,
   }) : id = id ?? newId();
 
@@ -61,10 +62,15 @@ class FormDataField {
 
   /// Optional explicit content type for the part.
   final String contentType;
+
+  /// Free-form note for this field. Never sent with the request.
+  final String description;
+
   final bool enabled;
 
   bool get isActive => enabled && key.isNotEmpty;
-  bool get isEmpty => key.isEmpty && value.isEmpty && filePath == null;
+  bool get isEmpty =>
+      key.isEmpty && value.isEmpty && filePath == null && description.isEmpty;
 
   FormDataField copyWith({
     String? key,
@@ -72,6 +78,7 @@ class FormDataField {
     FormFieldKind? kind,
     String? Function()? filePath,
     String? contentType,
+    String? description,
     bool? enabled,
   }) => FormDataField(
     id: id,
@@ -80,6 +87,7 @@ class FormDataField {
     kind: kind ?? this.kind,
     filePath: filePath != null ? filePath() : this.filePath,
     contentType: contentType ?? this.contentType,
+    description: description ?? this.description,
     enabled: enabled ?? this.enabled,
   );
 
@@ -90,6 +98,7 @@ class FormDataField {
     'kind': kind.name,
     if (filePath != null) 'filePath': filePath,
     if (contentType.isNotEmpty) 'contentType': contentType,
+    if (description.isNotEmpty) 'description': description,
     'enabled': enabled,
   };
 
@@ -100,6 +109,7 @@ class FormDataField {
     kind: json.str('kind') == 'file' ? FormFieldKind.file : FormFieldKind.text,
     filePath: json.strOrNull('filePath'),
     contentType: json.str('contentType'),
+    description: json.str('description'),
     enabled: json.boolean('enabled', true),
   );
 
@@ -112,11 +122,20 @@ class FormDataField {
       other.kind == kind &&
       other.filePath == filePath &&
       other.contentType == contentType &&
+      other.description == description &&
       other.enabled == enabled;
 
   @override
-  int get hashCode =>
-      Object.hash(id, key, value, kind, filePath, contentType, enabled);
+  int get hashCode => Object.hash(
+    id,
+    key,
+    value,
+    kind,
+    filePath,
+    contentType,
+    description,
+    enabled,
+  );
 }
 
 /// The request body. Every body type keeps its own content so switching type
