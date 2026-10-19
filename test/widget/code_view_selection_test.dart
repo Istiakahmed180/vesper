@@ -149,24 +149,33 @@ void main() {
     final origin = tester.getTopLeft(find.byType(CodeView));
     final lineHeight = (12.5 * 1.6).roundToDouble();
 
-    // One body line, wrapped across many rows: the third row still maps
-    // into line 0, further along than the first row.
+    // One body line, wrapped across many rows: tapping the same offset on
+    // later rows stays in line 0 and advances one row's worth of columns.
     expect(controller.body.lines, hasLength(1));
-    await tester.tapAt(origin + Offset(60, 6 + lineHeight * 0.5));
-    await tester.pump();
-    final first = controller.caret!;
-    await tester.tapAt(origin + Offset(60, 6 + lineHeight * 2.5));
-    await tester.pump();
-    final third = controller.caret!;
+    Future<CodePosition> caretAtRow(int row) async {
+      await tester.tapAt(origin + Offset(60, 6 + lineHeight * (row + 0.5)));
+      await tester.pump();
+      return controller.caret!;
+    }
+
+    final first = await caretAtRow(0);
+    final second = await caretAtRow(1);
+    final third = await caretAtRow(2);
     expect(first.line, 0);
+    expect(second.line, 0);
     expect(third.line, 0);
-    expect(third.col, greaterThan(first.col + 100));
+    // Rows tile the line evenly, so each row is the same step along it. The
+    // row width follows the font metrics, so it is measured, not assumed.
+    final step = second.col - first.col;
+    expect(step, greaterThan(20));
+    expect(third.col - second.col, step);
 
     // Arrow down moves one row, staying in the same line.
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
     await tester.pump();
-    expect(controller.caret!.line, 0);
-    expect(controller.caret!.col, greaterThan(third.col));
+    final fourth = controller.caret!;
+    expect(fourth.line, 0);
+    expect(fourth.col - third.col, step);
 
     await shortcut(tester, LogicalKeyboardKey.keyA);
     await shortcut(tester, LogicalKeyboardKey.keyC);
