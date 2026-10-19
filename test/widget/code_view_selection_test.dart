@@ -126,4 +126,50 @@ void main() {
     expect(range.$2.line, 5);
     expect(controller.selectedText.split('\n'), hasLength(4));
   });
+
+  testWidgets('wrap splits a long line into rows that select as one line', (
+    tester,
+  ) async {
+    final controller = CodeViewController(
+      formatText(json, CodeLanguage.json, pretty: false),
+    );
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.dark(),
+        home: Scaffold(
+          body: SizedBox(
+            width: 700,
+            height: 400,
+            child: CodeView(controller: controller, wrap: true),
+          ),
+        ),
+      ),
+    );
+    final origin = tester.getTopLeft(find.byType(CodeView));
+    final lineHeight = (12.5 * 1.6).roundToDouble();
+
+    // One body line, wrapped across many rows: the third row still maps
+    // into line 0, further along than the first row.
+    expect(controller.body.lines, hasLength(1));
+    await tester.tapAt(origin + Offset(60, 6 + lineHeight * 0.5));
+    await tester.pump();
+    final first = controller.caret!;
+    await tester.tapAt(origin + Offset(60, 6 + lineHeight * 2.5));
+    await tester.pump();
+    final third = controller.caret!;
+    expect(first.line, 0);
+    expect(third.line, 0);
+    expect(third.col, greaterThan(first.col + 100));
+
+    // Arrow down moves one row, staying in the same line.
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.pump();
+    expect(controller.caret!.line, 0);
+    expect(controller.caret!.col, greaterThan(third.col));
+
+    await shortcut(tester, LogicalKeyboardKey.keyA);
+    await shortcut(tester, LogicalKeyboardKey.keyC);
+    expect(clipboard, json);
+  });
 }

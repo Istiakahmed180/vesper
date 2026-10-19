@@ -158,6 +158,7 @@ class AppSettings {
     this.historyRetentionDays = AppConstants.defaultHistoryRetentionDays,
     this.historyMaxEntries = AppConstants.defaultHistoryMaxEntries,
     this.autoUpdate = true,
+    this.wrapResponseBody = false,
   });
 
   final ThemeMode themeMode;
@@ -172,6 +173,9 @@ class AppSettings {
   /// Check GitHub for new versions in the background.
   final bool autoUpdate;
 
+  /// Wrap long lines in the response body viewer.
+  final bool wrapResponseBody;
+
   AppSettings copyWith({
     ThemeMode? themeMode,
     StartupBehavior? startupBehavior,
@@ -180,6 +184,7 @@ class AppSettings {
     int? historyRetentionDays,
     int? historyMaxEntries,
     bool? autoUpdate,
+    bool? wrapResponseBody,
   }) => AppSettings(
     themeMode: themeMode ?? this.themeMode,
     startupBehavior: startupBehavior ?? this.startupBehavior,
@@ -188,6 +193,7 @@ class AppSettings {
     historyRetentionDays: historyRetentionDays ?? this.historyRetentionDays,
     historyMaxEntries: historyMaxEntries ?? this.historyMaxEntries,
     autoUpdate: autoUpdate ?? this.autoUpdate,
+    wrapResponseBody: wrapResponseBody ?? this.wrapResponseBody,
   );
 
   static const schemaVersion = 1;
@@ -201,6 +207,7 @@ class AppSettings {
     'historyRetentionDays': historyRetentionDays,
     'historyMaxEntries': historyMaxEntries,
     'autoUpdate': autoUpdate,
+    'wrapResponseBody': wrapResponseBody,
   };
 
   factory AppSettings.fromJson(JsonMap json) => AppSettings(
@@ -223,5 +230,6 @@ class AppSettings {
         .integer('historyMaxEntries', AppConstants.defaultHistoryMaxEntries)
         .clamp(10, 100000),
     autoUpdate: json.boolean('autoUpdate', true),
+    wrapResponseBody: json.boolean('wrapResponseBody', false),
   );
 }

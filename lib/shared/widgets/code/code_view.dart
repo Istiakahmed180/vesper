@@ -63,7 +63,7 @@ class CodeViewController extends ChangeNotifier {
   CodePosition? _caret;
 
   /// Set by the view; used to scroll to the current match.
-  void Function(int visibleIndex)? _scrollTo;
+  void Function(CodePosition position)? _scrollTo;
 
   FormattedBody get body => _body;
   List<int> get visible => _visible;
@@ -221,7 +221,7 @@ class CodeViewController extends ChangeNotifier {
     }
     _matchesByLine = byLine;
     _current = matches.isEmpty ? -1 : 0;
-    if (_current != -1) _reveal(matches[_current].line);
+    if (_current != -1) _reveal(matches[_current]);
     notifyListeners();
   }
 
@@ -229,11 +229,12 @@ class CodeViewController extends ChangeNotifier {
     if (_matches.isEmpty) return;
     _current = (_current + delta) % _matches.length;
     if (_current < 0) _current += _matches.length;
-    _reveal(_matches[_current].line);
+    _reveal(_matches[_current]);
     notifyListeners();
   }
 
-  void _reveal(int line) {
+  void _reveal(SearchMatch match) {
+    final line = match.line;
     final toOpen = _collapsed
         .where((s) => s < line && _body.foldEnd[s] >= line)
         .toList();
@@ -241,12 +242,9 @@ class CodeViewController extends ChangeNotifier {
       _collapsed.removeAll(toOpen);
       _recomputeVisible();
     }
-    final index = _visible.indexOf(line);
-    if (index != -1) {
-      WidgetsBinding.instance.addPostFrameCallback(
-        (_) => _scrollTo?.call(index),
-      );
-    }
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _scrollTo?.call(CodePosition(line, match.start)),
+    );
   }
 
   void _recomputeVisible() {
@@ -266,6 +264,29 @@ class CodeViewController extends ChangeNotifier {
   }
 }
 
+/// One row on screen: columns `[start, end)` of body line [line]. A line is
+/// a single row, or several when wrapping.
+@immutable
+class _Row {
+  const _Row(
+    this.line,
+    this.start,
+    this.end, {
+    required this.first,
+    required this.last,
+  });
+  final int line;
+  final int start;
+  final int end;
+  final bool first;
+  final bool last;
+
+  /// Whether the caret at [p] is drawn on this row. A column on a wrap
+  /// boundary belongs to the next row.
+  bool contains(CodePosition p) =>
+      p.line == line && p.col >= start && (p.col < end || last);
+}
+
 /// Virtualised, read-only code viewer with line numbers, folding, syntax
 /// highlighting and search highlights. Only visible rows are built; the caret
 /// and selection live in [CodeViewController], so Select All and Copy cover
@@ -275,11 +296,15 @@ class CodeView extends StatefulWidget {
     super.key,
     required this.controller,
     this.fontSize = 12.5,
+    this.wrap = false,
     this.extraMenuItems,
   });
 
   final CodeViewController controller;
   final double fontSize;
+
+  /// Wraps long lines at the viewport width instead of scrolling sideways.
+  final bool wrap;
 
   /// Extra right-click entries for the selected text, after Copy etc.
   final List<ContextMenuButtonItem> Function(String selection)? extraMenuItems;
@@ -291,6 +316,9 @@ class CodeView extends StatefulWidget {
 class _CodeViewState extends State<CodeView> {
   static const _padTop = 6.0;
   static const _foldWidth = 22.0;
+
+  /// Room kept right of wrapped text for the vertical scrollbar.
+  static const _wrapMargin = 16.0;
 
   final _vertical = ScrollController();
   final _horizontal = ScrollController();
@@ -309,6 +337,14 @@ class _CodeViewState extends State<CodeView> {
   // Layout of the last build, used for hit testing.
   double _gutter = 0;
   TextStyle _style = const TextStyle();
+  TextScaler _textScaler = TextScaler.noScaling;
+  List<_Row> _rows = const [];
+  (List<int>, List<String>, int?)? _rowsKey;
+
+  // Highlighted spans of wrapped lines with each span's start column, so
+  // tokens split across rows keep their colour.
+  final Map<int, (List<TextSpan>, List<int>)> _lineSpans = {};
+  (FormattedBody, VesperColors)? _spansKey;
 
   CodeViewController get _c => widget.controller;
 
@@ -327,6 +363,9 @@ class _CodeViewState extends State<CodeView> {
     if (old.controller != widget.controller) {
       old.controller._scrollTo = null;
       widget.controller._scrollTo = _scrollTo;
+    }
+    if (old.wrap != widget.wrap && _horizontal.hasClients) {
+      _horizontal.jumpTo(0);
     }
   }
 
@@ -359,8 +398,9 @@ class _CodeViewState extends State<CodeView> {
     _onFocus();
   }
 
-  void _scrollTo(int index) {
-    if (!_vertical.hasClients) return;
+  void _scrollTo(CodePosition position) {
+    final index = _rowIndexOf(position);
+    if (index == -1 || !_vertical.hasClients) return;
     final viewport = _vertical.position.viewportDimension;
     final target = (index * _lineHeight - viewport / 3).clamp(
       0.0,
@@ -373,7 +413,7 @@ class _CodeViewState extends State<CodeView> {
   void _revealCaret() {
     final caret = _c.caret;
     if (caret == null || !_vertical.hasClients) return;
-    final index = _c.visible.indexOf(caret.line);
+    final index = _rowIndexOf(caret);
     if (index == -1) return;
     final top = index * _lineHeight + _padTop;
     final pos = _vertical.position;
@@ -391,25 +431,111 @@ class _CodeViewState extends State<CodeView> {
 
   // ------------------------------------------------------------ hit testing
 
-  String _rendered(int line) {
-    final text = _c.body.lines[line];
+  /// Splits the visible lines into rows, [columns] characters wide when
+  /// wrapping. Without wrapping, long lines are clipped for rendering.
+  List<_Row> _layoutRows(List<int> visible, List<String> lines, int? columns) {
+    final key = (visible, lines, columns);
+    if (key == _rowsKey) return _rows;
     const limit = AppConstants.maxRenderedLineLength;
-    return text.length > limit ? text.substring(0, limit) : text;
+    final rows = <_Row>[];
+    for (final line in visible) {
+      final length = lines[line].length;
+      if (columns == null || length <= columns) {
+        rows.add(
+          _Row(line, 0, math.min(length, limit), first: true, last: true),
+        );
+        continue;
+      }
+      for (var start = 0; start < length; start += columns) {
+        final end = math.min(start + columns, length);
+        rows.add(
+          _Row(line, start, end, first: start == 0, last: end == length),
+        );
+      }
+    }
+    _rowsKey = key;
+    return _rows = rows;
+  }
+
+  /// Index in [_rows] of the row showing [p], or -1 when it is folded away.
+  int _rowIndexOf(CodePosition p) {
+    final rows = _rows;
+    var lo = 0;
+    var hi = rows.length;
+    while (lo < hi) {
+      final mid = (lo + hi) >> 1;
+      final r = rows[mid];
+      if (r.line < p.line || r.line == p.line && !r.last && r.end <= p.col) {
+        lo = mid + 1;
+      } else {
+        hi = mid;
+      }
+    }
+    return lo < rows.length && rows[lo].line == p.line ? lo : -1;
+  }
+
+  String _rowText(_Row row) =>
+      _c.body.lines[row.line].substring(row.start, row.end);
+
+  List<TextSpan> _spansFor(
+    _Row row,
+    String text,
+    SyntaxHighlighter highlighter,
+    CodeLanguage language,
+  ) {
+    if (row.first && row.last) return highlighter.highlight(text, language);
+    var entry = _lineSpans[row.line];
+    if (entry == null) {
+      if (_lineSpans.length >= 256) _lineSpans.clear();
+      final spans = highlighter.highlight(_c.body.lines[row.line], language);
+      final starts = <int>[];
+      var offset = 0;
+      for (final s in spans) {
+        starts.add(offset);
+        offset += s.text?.length ?? 0;
+      }
+      entry = _lineSpans[row.line] = (spans, starts);
+    }
+    final (spans, starts) = entry;
+    // First span starting after the row's start; the one before overlaps it.
+    var lo = 0;
+    var hi = starts.length;
+    while (lo < hi) {
+      final mid = (lo + hi) >> 1;
+      if (starts[mid] <= row.start) {
+        lo = mid + 1;
+      } else {
+        hi = mid;
+      }
+    }
+    final out = <TextSpan>[];
+    for (var i = math.max(0, lo - 1); i < spans.length; i++) {
+      if (starts[i] >= row.end) break;
+      final t = spans[i].text ?? '';
+      final from = math.max(row.start, starts[i]) - starts[i];
+      final to = math.min(row.end, starts[i] + t.length) - starts[i];
+      if (to > from) {
+        out.add(TextSpan(text: t.substring(from, to), style: spans[i].style));
+      }
+    }
+    return out;
   }
 
   TextPainter _painter(String text) => TextPainter(
     text: TextSpan(text: text, style: _style),
     textDirection: TextDirection.ltr,
+    textScaler: _textScaler,
     maxLines: 1,
   )..layout();
 
-  double _xOf(int line, int col) {
-    final text = _rendered(line);
-    if (col <= 0 || text.isEmpty) return 0;
+  double _xOf(_Row row, int col) {
+    final text = _rowText(row);
+    final offset = col - row.start;
+    if (offset <= 0 || text.isEmpty) return 0;
     final painter = _painter(text);
     final x = painter
         .getOffsetForCaret(
-          TextPosition(offset: math.min(col, text.length)),
+          TextPosition(offset: math.min(offset, text.length)),
           Rect.zero,
         )
         .dx;
@@ -419,23 +545,23 @@ class _CodeViewState extends State<CodeView> {
 
   /// Body position under [local] (relative to the viewer's viewport).
   CodePosition _positionAt(Offset local) {
-    final visible = _c.visible;
+    final rows = _rows;
     final y = local.dy + (_vertical.hasClients ? _vertical.offset : 0);
     final index = ((y - _padTop) / _lineHeight).floor();
-    if (index < 0) return const CodePosition(0, 0);
-    if (index >= visible.length) {
-      final last = visible.last;
+    if (index < 0 || rows.isEmpty) return const CodePosition(0, 0);
+    if (index >= rows.length) {
+      final last = rows.last.line;
       return CodePosition(last, _c.body.lines[last].length);
     }
-    final line = visible[index];
+    final row = rows[index];
     final x =
         local.dx + (_horizontal.hasClients ? _horizontal.offset : 0) - _gutter;
-    final text = _rendered(line);
-    if (x <= 0 || text.isEmpty) return CodePosition(line, 0);
+    final text = _rowText(row);
+    if (x <= 0 || text.isEmpty) return CodePosition(row.line, row.start);
     final painter = _painter(text);
     final col = painter.getPositionForOffset(Offset(x, _lineHeight / 2)).offset;
     painter.dispose();
-    return CodePosition(line, col);
+    return CodePosition(row.line, row.start + col);
   }
 
   (CodePosition, CodePosition) _wordAt(CodePosition p) {
@@ -575,11 +701,15 @@ class _CodeViewState extends State<CodeView> {
     final caret = _c.caret;
     if (caret == null) return KeyEventResult.ignored;
     final lines = _c.body.lines;
-    final visible = _c.visible;
     CodePosition vertical(int delta) {
-      final index = visible.indexOf(caret.line);
-      final next = visible[(index + delta).clamp(0, visible.length - 1)];
-      return CodePosition(next, math.min(caret.col, lines[next].length));
+      final index = _rowIndexOf(caret);
+      if (index == -1) return caret;
+      final from = _rows[index];
+      final to = _rows[(index + delta).clamp(0, _rows.length - 1)];
+      final col = to.start + caret.col - from.start;
+      // Stay on a wrapped row rather than its boundary with the next one.
+      final max = to.last ? lines[to.line].length : to.end - 1;
+      return CodePosition(to.line, math.min(col, max));
     }
 
     final range = _c.selection;
@@ -651,12 +781,14 @@ class _CodeViewState extends State<CodeView> {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final style = _style = AppTheme.mono(
-      context,
-      size: widget.fontSize,
-    ).copyWith(height: 1.6);
+    // Hit testing measures with the same style and scaling the lines render
+    // with, including what Text inherits (e.g. the theme's letter spacing).
+    final style = _style = DefaultTextStyle.of(context).style.merge(
+      AppTheme.mono(context, size: widget.fontSize).copyWith(height: 1.6),
+    );
+    final textScaler = _textScaler = MediaQuery.textScalerOf(context);
     final highlighter = SyntaxHighlighter(colors);
-    final charWidth = _measureCharWidth(style);
+    final charWidth = _measureCharWidth(style, textScaler);
     final selectionColor = colors.accent.withValues(alpha: 0.32);
 
     return ListenableBuilder(
@@ -666,11 +798,11 @@ class _CodeViewState extends State<CodeView> {
         final body = c.body;
         final digits = body.lines.length.toString().length;
         final gutter = _gutter = digits * charWidth + 12 + _foldWidth;
-        final renderedChars = math.min(
-          body.maxLineLength,
-          AppConstants.maxRenderedLineLength + 40,
-        );
-        final contentWidth = gutter + renderedChars * charWidth + 48;
+        final spansKey = (body, colors);
+        if (_spansKey != spansKey) {
+          _lineSpans.clear();
+          _spansKey = spansKey;
+        }
         final currentMatch =
             c.currentMatch >= 0 && c.currentMatch < c.matches.length
             ? c.matches[c.currentMatch]
@@ -679,6 +811,28 @@ class _CodeViewState extends State<CodeView> {
 
         return LayoutBuilder(
           builder: (context, constraints) {
+            final wrap = widget.wrap;
+            final rows = _layoutRows(
+              c.visible,
+              body.lines,
+              wrap
+                  ? math.max(
+                      1,
+                      ((constraints.maxWidth - gutter - _wrapMargin) /
+                              charWidth)
+                          .floor(),
+                    )
+                  : null,
+            );
+            final contentWidth = wrap
+                ? constraints.maxWidth
+                : gutter +
+                      math.min(
+                            body.maxLineLength,
+                            AppConstants.maxRenderedLineLength + 40,
+                          ) *
+                          charWidth +
+                      48;
             final width = math.max(constraints.maxWidth, contentWidth);
             return Focus(
               focusNode: _focus,
@@ -706,35 +860,52 @@ class _CodeViewState extends State<CodeView> {
                             child: ListView.builder(
                               controller: _vertical,
                               itemExtent: _lineHeight,
-                              itemCount: c.visible.length,
+                              itemCount: rows.length,
                               padding: const EdgeInsets.symmetric(
                                 vertical: _padTop,
                               ),
                               itemBuilder: (context, index) {
-                                final line = c.visible[index];
+                                final row = rows[index];
+                                final line = row.line;
+                                final length = body.lines[line].length;
+                                final text = _rowText(row);
+                                final collapsed = c.isCollapsed(line);
+                                final selected = c.selectionOnLine(line);
                                 return _CodeLine(
                                   line: line,
-                                  text: body.lines[line],
-                                  language: body.language,
-                                  highlighter: highlighter,
+                                  start: row.start,
+                                  text: text,
+                                  spans: _spansFor(
+                                    row,
+                                    text,
+                                    highlighter,
+                                    body.language,
+                                  ),
                                   style: style,
                                   gutterWidth: gutter,
-                                  foldable: body.foldEnd[line] != -1,
-                                  collapsed: c.isCollapsed(line),
-                                  closingText: c.isCollapsed(line)
+                                  showNumber: row.first,
+                                  foldable:
+                                      row.first && body.foldEnd[line] != -1,
+                                  collapsed: collapsed,
+                                  closingText: row.last && collapsed
                                       ? body.lines[body.foldEnd[line]].trim()
                                       : null,
-                                  hiddenCount: c.isCollapsed(line)
+                                  hiddenCount: collapsed
                                       ? body.foldEnd[line] - line - 1
                                       : 0,
+                                  hiddenChars: row.last ? length - row.end : 0,
                                   matches: c.matchesOnLine(line),
                                   currentMatch: currentMatch?.line == line
                                       ? currentMatch
                                       : null,
-                                  selected: c.selectionOnLine(line),
+                                  selected: selected,
+                                  selectsBreak:
+                                      row.last &&
+                                      selected != null &&
+                                      selected.$2 > length,
                                   selectionColor: selectionColor,
-                                  caretX: caret?.line == line
-                                      ? _xOf(line, caret!.col)
+                                  caretX: caret != null && row.contains(caret)
+                                      ? _xOf(row, caret.col)
                                       : null,
                                   caretVisible: _caretVisible,
                                   onToggle: () => c.toggleFold(line),
@@ -755,10 +926,11 @@ class _CodeViewState extends State<CodeView> {
     );
   }
 
-  static double _measureCharWidth(TextStyle style) {
+  static double _measureCharWidth(TextStyle style, TextScaler textScaler) {
     final painter = TextPainter(
       text: TextSpan(text: 'MMMMMMMMMM', style: style),
       textDirection: TextDirection.ltr,
+      textScaler: textScaler,
     )..layout();
     final w = painter.width / 10;
     painter.dispose();
@@ -769,18 +941,21 @@ class _CodeViewState extends State<CodeView> {
 class _CodeLine extends StatelessWidget {
   const _CodeLine({
     required this.line,
+    required this.start,
     required this.text,
-    required this.language,
-    required this.highlighter,
+    required this.spans,
     required this.style,
     required this.gutterWidth,
+    required this.showNumber,
     required this.foldable,
     required this.collapsed,
     required this.closingText,
     required this.hiddenCount,
+    required this.hiddenChars,
     required this.matches,
     required this.currentMatch,
     required this.selected,
+    required this.selectsBreak,
     required this.selectionColor,
     required this.caretX,
     required this.caretVisible,
@@ -788,20 +963,31 @@ class _CodeLine extends StatelessWidget {
   });
 
   final int line;
+
+  /// Column of the line where this row's [text] begins.
+  final int start;
   final String text;
-  final CodeLanguage language;
-  final SyntaxHighlighter highlighter;
+  final List<TextSpan> spans;
   final TextStyle style;
   final double gutterWidth;
+
+  /// False on the continuation rows of a wrapped line.
+  final bool showNumber;
   final bool foldable;
   final bool collapsed;
+
+  /// The folded block's closing text, on the last row of a collapsed line.
   final String? closingText;
   final int hiddenCount;
+
+  /// Characters of the line past this row that are not rendered.
+  final int hiddenChars;
   final List<SearchMatch> matches;
   final SearchMatch? currentMatch;
 
-  /// Selected columns on this line; an end past the text selects the break.
+  /// Selected columns on the whole line; an end past it selects the break.
   final (int, int)? selected;
+  final bool selectsBreak;
   final Color selectionColor;
 
   /// Caret offset from the start of the text, when the caret is here.
@@ -812,15 +998,10 @@ class _CodeLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    const limit = AppConstants.maxRenderedLineLength;
-    final clipped = text.length > limit;
-    final visibleText = clipped ? text.substring(0, limit) : text;
-
-    var spans = highlighter.highlight(visibleText, language);
+    var spans = this.spans;
     if (matches.isNotEmpty || selected != null) {
-      spans = _applyMarks(spans, visibleText, colors);
+      spans = _applyMarks(spans, colors);
     }
-    final selectsBreak = selected != null && selected!.$2 > text.length;
 
     return Row(
       children: [
@@ -831,7 +1012,7 @@ class _CodeLine extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    '${line + 1}',
+                    showNumber ? '${line + 1}' : '',
                     textAlign: TextAlign.right,
                     style: style.copyWith(
                       color: colors.textMuted,
@@ -870,7 +1051,7 @@ class _CodeLine extends StatelessWidget {
                         text: ' ',
                         style: TextStyle(backgroundColor: selectionColor),
                       ),
-                    if (collapsed) ...[
+                    if (closingText != null) ...[
                       WidgetSpan(
                         alignment: PlaceholderAlignment.middle,
                         child: SelectionContainer.disabled(
@@ -902,10 +1083,10 @@ class _CodeLine extends StatelessWidget {
                         style: TextStyle(color: colors.syntaxPunctuation),
                       ),
                     ],
-                    if (clipped)
+                    if (hiddenChars > 0)
                       TextSpan(
                         text:
-                            '  … ${text.length - limit} more characters (use Copy to get the full line)',
+                            '  … $hiddenChars more characters (use Copy to get the full line)',
                         style: TextStyle(
                           color: colors.textMuted,
                           fontStyle: FontStyle.italic,
@@ -939,26 +1120,28 @@ class _CodeLine extends StatelessWidget {
 
   /// Splits highlighted spans so the selection and search matches get a
   /// background colour.
-  List<TextSpan> _applyMarks(
-    List<TextSpan> spans,
-    String visibleText,
-    VesperColors colors,
-  ) {
-    // 0 = plain, 1 = match, 2 = selected, 3 = current match.
-    final marks = List<int>.filled(visibleText.length, 0);
+  List<TextSpan> _applyMarks(List<TextSpan> spans, VesperColors colors) {
+    // 0 = plain, 1 = match, 2 = selected, 3 = current match. Indexed by
+    // column within this row.
+    final marks = List<int>.filled(text.length, 0);
+    final end = start + text.length;
     final sel = selected;
     if (sel != null) {
-      for (var i = sel.$1; i < sel.$2 && i < marks.length; i++) {
-        marks[i] = 2;
+      for (var i = math.max(sel.$1, start); i < sel.$2 && i < end; i++) {
+        marks[i - start] = 2;
       }
     }
     for (final m in matches) {
       final isCurrent = identical(m, currentMatch);
-      for (var i = m.start; i < m.start + m.length && i < marks.length; i++) {
+      for (
+        var i = math.max(m.start, start);
+        i < m.start + m.length && i < end;
+        i++
+      ) {
         if (isCurrent) {
-          marks[i] = 3;
-        } else if (marks[i] == 0) {
-          marks[i] = 1;
+          marks[i - start] = 3;
+        } else if (marks[i - start] == 0) {
+          marks[i - start] = 1;
         }
       }
     }

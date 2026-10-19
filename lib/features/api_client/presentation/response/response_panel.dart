@@ -17,6 +17,7 @@ import '../../../../core/utils/platform_keys.dart';
 import '../../../../shared/widgets/code/code_view.dart';
 import '../../../../shared/widgets/dialogs.dart';
 import '../../../../shared/widgets/section_tabs.dart';
+import '../../../settings/presentation/settings_controller.dart';
 import '../../../workspace/presentation/response_controller.dart';
 import '../../../workspace/presentation/variable_updater.dart';
 import '../../domain/models/api_response.dart';
@@ -275,16 +276,16 @@ class _StatusSummary extends StatelessWidget {
   }
 }
 
-class _BodyView extends StatefulWidget {
+class _BodyView extends ConsumerStatefulWidget {
   const _BodyView({required this.tabId, required this.response});
   final String tabId;
   final ApiResponse response;
 
   @override
-  State<_BodyView> createState() => _BodyViewState();
+  ConsumerState<_BodyView> createState() => _BodyViewState();
 }
 
-class _BodyViewState extends State<_BodyView> {
+class _BodyViewState extends ConsumerState<_BodyView> {
   late BodyView _view = widget.response.contentKind == ResponseContentKind.image
       ? BodyView.preview
       : BodyView.pretty;
@@ -306,6 +307,12 @@ class _BodyViewState extends State<_BodyView> {
 
   bool get _showsBase64 =>
       _view == BodyView.pretty && _format == BodyFormat.base64;
+
+  /// Whether the body is shown in the code viewer.
+  bool get _showsCode =>
+      r.bodyBytes.isNotEmpty &&
+      _view != BodyView.preview &&
+      (r.isTextual || _showsBase64);
 
   @override
   void dispose() {
@@ -383,6 +390,7 @@ class _BodyViewState extends State<_BodyView> {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final kind = r.contentKind;
+    final wrap = ref.watch(settingsProvider.select((s) => s.wrapResponseBody));
     final views = [
       BodyView.pretty,
       BodyView.raw,
@@ -448,6 +456,15 @@ class _BodyViewState extends State<_BodyView> {
                       icon: const Icon(Icons.unfold_more),
                     ),
                   ],
+                  if (_showsCode)
+                    IconButton(
+                      tooltip: wrap ? 'Unwrap lines' : 'Wrap lines',
+                      isSelected: wrap,
+                      onPressed: () => ref
+                          .read(settingsProvider.notifier)
+                          .update((s) => s.copyWith(wrapResponseBody: !wrap)),
+                      icon: const Icon(Icons.wrap_text),
+                    ),
                   if (r.isTextual || _showsBase64)
                     IconButton(
                       tooltip: 'Search (${PlatformKeys.combo('F')})',
@@ -652,6 +669,9 @@ class _BodyViewState extends State<_BodyView> {
               child: Consumer(
                 builder: (context, ref, _) => CodeView(
                   controller: view,
+                  wrap: ref.watch(
+                    settingsProvider.select((s) => s.wrapResponseBody),
+                  ),
                   extraMenuItems: (selection) => [
                     ?setVariableMenuItem(
                       context,
