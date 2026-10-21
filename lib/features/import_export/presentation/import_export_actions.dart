@@ -61,11 +61,12 @@ class ImportExportActions {
     ];
   }
 
-  /// Parses each file and hands it to [store]; one bad file does not stop
-  /// the others. Reports a summary toast and any notes.
+  /// Parses each file and hands it to [store], which returns the document
+  /// it stored, or null when the user skipped it. One bad file does not
+  /// stop the others. Reports a summary toast and any notes.
   Future<void> _importFiles(
     List<_PickedFile> files,
-    Future<void> Function(CollectionDocument doc) store, {
+    Future<CollectionDocument?> Function(CollectionDocument doc) store, {
     required String Function(CollectionDocument doc, String counts) single,
     required String Function(int count, String counts) many,
     List<String> Function(CollectionDocument doc)? extraNotes,
@@ -75,6 +76,7 @@ class ImportExportActions {
     final notes = <String>[];
     final imported = <CollectionDocument>[];
     final failed = <String>[];
+    var skipped = 0;
     var sources = '';
     for (final file in files) {
       final label = files.length > 1 ? '${file.name}: ' : '';
@@ -85,8 +87,12 @@ class ImportExportActions {
         }
         final json = await ImportService.decode(text);
         final result = service.parseCollection(json);
-        await store(result.value);
-        imported.add(result.value);
+        final stored = await store(result.value);
+        if (stored == null) {
+          skipped++;
+          continue;
+        }
+        imported.add(stored);
         sources = result.source;
         final fileNotes = [
           ...result.warnings,
@@ -100,6 +106,7 @@ class ImportExportActions {
     if (!context.mounted) return;
 
     final counts = _counts([for (final d in imported) ...d.items]);
+    if (imported.isEmpty && failed.isEmpty) return;
     if (imported.isEmpty) {
       showToast(
         context,
@@ -112,6 +119,7 @@ class ImportExportActions {
       showToast(
         context,
         '${many(imported.length, counts)}'
+        '${skipped == 0 ? '' : ' · $skipped skipped'}'
         '${failed.isEmpty ? '' : ' · ${failed.length} failed'}',
         error: failed.isNotEmpty,
       );
@@ -124,22 +132,149 @@ class ImportExportActions {
     if (all.isNotEmpty) await _showWarnings(all);
   }
 
-  /// Imports one or more collection files, each as a new collection.
+  /// Imports one or more collection files, each as a new collection. When a
+  /// collection with the same name exists, asks whether to replace it or
+  /// add the import as a copy.
   Future<void> importCollection({String? fromText}) async {
     final files = fromText != null
         ? [_PickedFile('Pasted text', text: fromText)]
         : await _pickJsonFiles('Import collections');
+    if (files.isEmpty) return;
+    final repo = ref.read(collectionRepositoryProvider);
+    final existing = {
+      for (final t in await repo.watchTrees().first)
+        t.collection.name: t.collection.id,
+    };
+    final resolve = _duplicateResolver('collection', many: files.length > 1);
     final ids = <String>[];
+    final replaced = <String>{};
     await _importFiles(
       files,
-      (doc) async => ids.add(
-        await ref.read(collectionRepositoryProvider).importCollection(doc),
-      ),
-      single: (doc, counts) => 'Imported "${doc.name}": $counts',
+      (doc) async {
+        var target = doc;
+        if (existing[doc.name] case final id?) {
+          switch (await resolve(doc.name)) {
+            case null:
+              return null;
+            case _DuplicateAction.replace:
+              await repo.replaceCollection(id, doc);
+              ids.add(id);
+              replaced.add(doc.name);
+              return doc;
+            case _DuplicateAction.copy:
+              target = CollectionDocument(
+                name: _copyName(doc.name, existing.keys),
+                description: doc.description,
+                items: doc.items,
+                settings: doc.settings,
+              );
+          }
+        }
+        final id = await repo.importCollection(target);
+        existing[target.name] = id;
+        ids.add(id);
+        return target;
+      },
+      single: (doc, counts) =>
+          '${replaced.contains(doc.name) ? 'Replaced' : 'Imported'} '
+          '"${doc.name}": $counts',
       many: (n, counts) => 'Imported $n collections: $counts',
     );
     if (ids.length == 1) ref.read(expandedNodesProvider.notifier).expand(ids);
   }
+
+  /// Returns a function asking what to do with an imported [kind] whose
+  /// name is taken; it returns null when the user skips that one. With
+  /// [many], the dialog offers to reuse the answer for the remaining
+  /// duplicates of this import.
+  Future<_DuplicateAction?> Function(String name) _duplicateResolver(
+    String kind, {
+    bool many = false,
+  }) {
+    _DuplicateAction? forAll;
+    return (name) async {
+      if (forAll != null) return forAll;
+      if (!context.mounted) return null;
+      final answer = await _askDuplicate(kind, name, offerForAll: many);
+      if (answer == null) return null;
+      if (answer.forAll) forAll = answer.action;
+      return answer.action;
+    };
+  }
+
+  /// "[name] copy", or "[name] copy 2", "[name] copy 3"… when taken.
+  static String _copyName(String name, Iterable<String> taken) {
+    final names = taken.toSet();
+    var candidate = '$name copy';
+    for (var n = 2; names.contains(candidate); n++) {
+      candidate = '$name copy $n';
+    }
+    return candidate;
+  }
+
+  Future<({_DuplicateAction action, bool forAll})?> _askDuplicate(
+    String kind,
+    String name, {
+    required bool offerForAll,
+  }) => showDialog(
+    context: context,
+    builder: (context) {
+      var forAll = false;
+      return StatefulBuilder(
+        builder: (context, setState) {
+          final colors = context.colors;
+          void pick(_DuplicateAction action) =>
+              Navigator.pop(context, (action: action, forAll: forAll));
+          return AlertDialog(
+            title: Text('Duplicate $kind'),
+            content: SizedBox(
+              width: 440,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'A $kind named "$name" already exists. Replace it with '
+                    'the imported one, or add the import as a copy?',
+                    style: TextStyle(fontSize: 13, color: colors.textSecondary),
+                  ),
+                  if (offerForAll) ...[
+                    const SizedBox(height: 12),
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      controlAffinity: ListTileControlAffinity.leading,
+                      value: forAll,
+                      onChanged: (v) => setState(() => forAll = v ?? false),
+                      title: const Text(
+                        'Do this for all duplicates',
+                        style: TextStyle(fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Skip'),
+              ),
+              TextButton(
+                onPressed: () => pick(_DuplicateAction.copy),
+                child: const Text('Add as copy'),
+              ),
+              FilledButton(
+                autofocus: true,
+                style: FilledButton.styleFrom(backgroundColor: colors.danger),
+                onPressed: () => pick(_DuplicateAction.replace),
+                child: const Text('Replace'),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
 
   /// Imports one or more collection files and appends their folders and
   /// requests to the existing collection [collectionId], or to its folder
@@ -152,9 +287,12 @@ class ImportExportActions {
     final files = await _pickJsonFiles('Import into "$targetName"');
     await _importFiles(
       files,
-      (doc) => ref
-          .read(collectionRepositoryProvider)
-          .importIntoCollection(collectionId, doc, folderId: folderId),
+      (doc) async {
+        await ref
+            .read(collectionRepositoryProvider)
+            .importIntoCollection(collectionId, doc, folderId: folderId);
+        return doc;
+      },
       single: (_, counts) => 'Imported $counts into "$targetName"',
       many: (n, counts) => 'Imported $n files into "$targetName": $counts',
       extraNotes: (doc) => [
@@ -202,14 +340,41 @@ class ImportExportActions {
       final result = ref
           .read(importServiceProvider)
           .parseEnvironment(await ImportService.decode(text));
-      await ref
-          .read(environmentRepositoryProvider)
-          .createEnvironment(
-            result.value.name,
-            variables: result.value.variables,
-          );
+      final repo = ref.read(environmentRepositoryProvider);
+      final envs = [
+        for (final e in await repo.watchEnvironments().first)
+          if (!e.isGlobal) e,
+      ];
+      final imported = result.value;
+      var name = imported.name;
+      var verb = 'Imported';
+      final match = envs.where((e) => e.name == name).firstOrNull;
+      final action = match == null
+          ? null
+          : await _duplicateResolver('environment')(name);
+      if (match != null && action == null) return;
+      if (match != null && action == _DuplicateAction.replace) {
+        // Secret values left out of the file keep their local value.
+        final local = {for (final v in match.variables) v.key: v};
+        await repo.saveEnvironment(
+          match.copyWith(
+            variables: [
+              for (final v in imported.variables)
+                v.isSecret && v.value.isEmpty
+                    ? v.copyWith(value: local[v.key]?.value ?? '')
+                    : v,
+            ],
+          ),
+        );
+        verb = 'Replaced';
+      } else {
+        if (match != null) {
+          name = _copyName(name, [for (final e in envs) e.name]);
+        }
+        await repo.createEnvironment(name, variables: imported.variables);
+      }
       if (!context.mounted) return;
-      showToast(context, 'Imported environment "${result.value.name}"');
+      showToast(context, '$verb environment "$name"');
       if (result.warnings.isNotEmpty) await _showWarnings(result.warnings);
     } catch (e) {
       if (context.mounted) showToast(context, e.userMessage, error: true);
@@ -454,6 +619,9 @@ class ImportExportActions {
     ),
   );
 }
+
+/// What to do with an imported item whose name is already taken.
+enum _DuplicateAction { replace, copy }
 
 class _PickedFile {
   const _PickedFile(this.name, {this.text, this.error});
