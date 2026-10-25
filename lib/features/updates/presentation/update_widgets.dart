@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -136,6 +138,74 @@ class UpdateBanner extends ConsumerWidget {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// Status bar label with the app version; click to check for updates.
+class UpdateStatusLabel extends ConsumerWidget {
+  const UpdateStatusLabel({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(updateProvider);
+    final colors = context.colors;
+    final current = ref.watch(currentVersionProvider);
+    final supported = ref.watch(updateServiceProvider) != null;
+    final release = state.release;
+
+    final (IconData icon, String tooltip, Color? color) = switch (state.phase) {
+      _ when !supported => (
+        Icons.info_outline,
+        'Updates are not available on this system.',
+        null,
+      ),
+      UpdatePhase.checking => (Icons.sync, 'Checking for updates…', null),
+      UpdatePhase.upToDate => (
+        Icons.check_circle_outline,
+        'You have the latest version · click to check again',
+        colors.success,
+      ),
+      UpdatePhase.available => (
+        Icons.system_update_alt,
+        'Version ${release?.version} is available · click to check again',
+        colors.accent,
+      ),
+      UpdatePhase.downloading => (
+        Icons.downloading,
+        'Downloading ${release?.version}… ${(state.progress * 100).round()}%',
+        null,
+      ),
+      UpdatePhase.failed => (
+        Icons.error_outline,
+        '${state.error ?? 'The update failed.'} · click to check again',
+        colors.danger,
+      ),
+      UpdatePhase.idle => (
+        Icons.info_outline,
+        'Click to check for updates',
+        null,
+      ),
+    };
+
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        key: const ValueKey('update-status-label'),
+        onTap: !supported || state.busy
+            ? null
+            : () => ref.read(updateProvider.notifier).check(manual: true),
+        child: Row(
+          children: [
+            Icon(icon, size: 12, color: color ?? colors.textMuted),
+            const SizedBox(width: 5),
+            Text(
+              '${AppConstants.appName} $current · ${Platform.operatingSystem}',
+              style: TextStyle(fontSize: 11.5, color: colors.textMuted),
+            ),
+          ],
+        ),
       ),
     );
   }

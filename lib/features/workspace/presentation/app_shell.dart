@@ -450,10 +450,7 @@ class _StatusBar extends ConsumerWidget {
             item(Icons.hub_outlined, '@${github.account.login}'),
           const CloudSyncStatus(),
           const Spacer(),
-          Text(
-            '${AppConstants.appName} ${AppConstants.appVersion} · ${Platform.operatingSystem}',
-            style: style,
-          ),
+          const UpdateStatusLabel(),
         ],
       ),
     );
