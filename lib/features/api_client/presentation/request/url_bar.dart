@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_colors.dart';
@@ -34,10 +35,47 @@ class UrlBar extends ConsumerStatefulWidget {
 class _UrlBarState extends ConsumerState<UrlBar> {
   final _focus = FocusNode();
 
+  /// URL undo/redo. Tracks every URL change (typing, paste, params table,
+  /// cURL import), so a mistaken edit can be undone with Cmd/Ctrl+Z.
+  final _undo = <String>[];
+  final _redo = <String>[];
+  DateTime _lastChange = DateTime(0);
+
+  /// URL set by undo/redo, so the change it causes is not recorded.
+  String? _restoring;
+
+  static const _coalesce = Duration(milliseconds: 800);
+
   @override
   void dispose() {
     _focus.dispose();
     super.dispose();
+  }
+
+  void _recordUrlChange(String previous, String next) {
+    if (next == _restoring) {
+      _restoring = null;
+      return;
+    }
+    // Typing in quick succession is one undo step.
+    final now = DateTime.now();
+    if (_undo.isEmpty || now.difference(_lastChange) > _coalesce) {
+      _undo.add(previous);
+      if (_undo.length > 100) _undo.removeAt(0);
+    }
+    _lastChange = now;
+    _redo.clear();
+  }
+
+  void _restore(List<String> from, List<String> to) {
+    if (from.isEmpty) return;
+    final current =
+        ref.read(requestTabProvider(widget.tabId))?.draft.url ?? '';
+    to.add(current);
+    final url = from.removeLast();
+    _restoring = url;
+    _lastChange = DateTime(0);
+    ref.read(workspaceProvider.notifier).setUrl(widget.tabId, url);
   }
 
   void _onUrlChanged(String value) {
@@ -96,6 +134,17 @@ class _UrlBarState extends ConsumerState<UrlBar> {
           ?.findAncestorStateOfType<EditableTextState>();
       field?.selectAll(SelectionChangedCause.keyboard);
     });
+    ref.listen(
+      requestTabProvider(widget.tabId).select((t) => t?.draft.url),
+      (previous, next) {
+        if (previous != null && next != null && previous != next) {
+          _recordUrlChange(previous, next);
+        }
+      },
+    );
+    final mac = PlatformKeys.isMac;
+    void undo() => _restore(_undo, _redo);
+    void redo() => _restore(_redo, _undo);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
@@ -122,17 +171,39 @@ class _UrlBarState extends ConsumerState<UrlBar> {
                   ),
                   Container(width: 1, height: 20, color: colors.border),
                   Expanded(
-                    child: VariableField(
-                      value: url,
-                      focusNode: _focus,
-                      monospace: true,
-                      borderless: true,
-                      // Credentials belong in Authorization/Headers.
-                      suggestCredentials: false,
-                      hint:
-                          'Enter a URL, {{base_url}}/path, or paste a cURL command',
-                      onChanged: _onUrlChanged,
-                      onSubmitted: (_) => actions.send(widget.tabId),
+                    // Replaces the text field's own undo, which misses
+                    // changes made outside the field.
+                    child: CallbackShortcuts(
+                      bindings: {
+                        SingleActivator(
+                          LogicalKeyboardKey.keyZ,
+                          meta: mac,
+                          control: !mac,
+                        ): undo,
+                        SingleActivator(
+                          LogicalKeyboardKey.keyZ,
+                          meta: mac,
+                          control: !mac,
+                          shift: true,
+                        ): redo,
+                        if (!mac)
+                          const SingleActivator(
+                            LogicalKeyboardKey.keyY,
+                            control: true,
+                          ): redo,
+                      },
+                      child: VariableField(
+                        value: url,
+                        focusNode: _focus,
+                        monospace: true,
+                        borderless: true,
+                        // Credentials belong in Authorization/Headers.
+                        suggestCredentials: false,
+                        hint:
+                            'Enter a URL, {{base_url}}/path, or paste a cURL command',
+                        onChanged: _onUrlChanged,
+                        onSubmitted: (_) => actions.send(widget.tabId),
+                      ),
                     ),
                   ),
                 ],

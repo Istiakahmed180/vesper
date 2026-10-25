@@ -46,10 +46,12 @@ class _AppShellState extends ConsumerState<AppShell> with WindowListener {
   Future<bool>? _pendingExit;
   Future<void>? _cleanup;
   bool _exitConfirmed = false;
+  final _shellFocus = FocusNode(debugLabel: 'shell');
 
   @override
   void initState() {
     super.initState();
+    FocusManager.instance.addListener(_keepFocusInShell);
     _windowManaged = ref.read(windowManagedProvider);
     // Quit from the menu, Dock or system arrives as an exit request.
     _lifecycle = AppLifecycleListener(onExitRequested: _onExitRequested);
@@ -61,9 +63,24 @@ class _AppShellState extends ConsumerState<AppShell> with WindowListener {
 
   @override
   void dispose() {
+    FocusManager.instance.removeListener(_keepFocusInShell);
+    _shellFocus.dispose();
     _lifecycle.dispose();
     if (_windowManaged) windowManager.removeListener(this);
     super.dispose();
+  }
+
+  /// Shortcuts only see key events while focus is inside the shell. When the
+  /// focused field is clicked out of or removed, focus falls back to an
+  /// enclosing scope; pull it back so e.g. Cmd/Ctrl+Enter keeps working.
+  /// Dialogs have their own scope and are left alone.
+  void _keepFocusInShell() {
+    final primary = FocusManager.instance.primaryFocus;
+    if (primary is FocusScopeNode &&
+        _shellFocus.context != null &&
+        _shellFocus.ancestors.contains(primary)) {
+      _shellFocus.requestFocus();
+    }
   }
 
   Future<AppExitResponse> _onExitRequested() async {
@@ -201,12 +218,12 @@ class _AppShellState extends ConsumerState<AppShell> with WindowListener {
         bindings: {
           for (final c in AppCommand.values) c.activator: () => runner.run(c),
         },
-        child: Focus(autofocus: true, child: content),
+        child: Focus(focusNode: _shellFocus, autofocus: true, child: content),
       );
     } else {
       content = PlatformMenuBar(
         menus: _menus(runner),
-        child: Focus(autofocus: true, child: content),
+        child: Focus(focusNode: _shellFocus, autofocus: true, child: content),
       );
     }
     return content;
