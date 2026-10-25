@@ -67,7 +67,10 @@ class CollectionTreeView extends ConsumerWidget {
     final treesAsync = ref.watch(collectionTreesProvider);
     final filtered = ref.watch(filteredTreesProvider);
     final expanded = ref.watch(expandedNodesProvider);
+    final collapsed = ref.watch(searchCollapsedNodesProvider);
     final searching = filtered != null;
+    bool isOpen(String id) =>
+        searching ? !collapsed.contains(id) : expanded.contains(id);
 
     return treesAsync.when(
       loading: () => const Center(
@@ -114,7 +117,7 @@ class CollectionTreeView extends ConsumerWidget {
           for (var i = 0; i < nodes.length; i++) {
             final n = nodes[i];
             rows.add(_Row.node(n, depth, cid, i));
-            if (n is FolderNode && (searching || expanded.contains(n.id))) {
+            if (n is FolderNode && isOpen(n.id)) {
               addNodes(n.children, depth + 1, cid);
             }
           }
@@ -123,7 +126,7 @@ class CollectionTreeView extends ConsumerWidget {
         for (var i = 0; i < trees.length; i++) {
           final t = trees[i];
           rows.add(_Row.collection(t, i));
-          if (searching || expanded.contains(t.collection.id)) {
+          if (isOpen(t.collection.id)) {
             addNodes(t.children, 1, t.collection.id);
           }
         }
@@ -138,8 +141,7 @@ class CollectionTreeView extends ConsumerWidget {
               return _CollectionRow(
                 tree: row.tree!,
                 index: row.index,
-                expanded:
-                    searching || expanded.contains(row.tree!.collection.id),
+                expanded: isOpen(row.tree!.collection.id),
               );
             }
             return switch (row.node!) {
@@ -147,7 +149,7 @@ class CollectionTreeView extends ConsumerWidget {
                 node: f,
                 depth: row.depth,
                 index: row.index,
-                expanded: searching || expanded.contains(f.id),
+                expanded: isOpen(f.id),
               ),
               final RequestNode r => _RequestRow(
                 node: r,
@@ -174,6 +176,16 @@ Future<void> _createCollection(BuildContext context, WidgetRef ref) async {
     () => ref.read(collectionRepositoryProvider).createCollection(name),
   );
   if (c != null) ref.read(expandedNodesProvider.notifier).expand([c.id]);
+}
+
+/// Search results start expanded, so collapsing there is tracked apart from
+/// the normal expanded set.
+void _toggleNode(WidgetRef ref, String id) {
+  if (ref.read(filteredTreesProvider) != null) {
+    ref.read(searchCollapsedNodesProvider.notifier).toggle(id);
+  } else {
+    ref.read(expandedNodesProvider.notifier).toggle(id);
+  }
 }
 
 Future<void> newCollectionCommand(BuildContext context, WidgetRef ref) =>
@@ -413,7 +425,7 @@ class _CollectionRow extends ConsumerWidget {
         child: _TreeRowShell(
           depth: 0,
           dropHighlight: candidates.isNotEmpty,
-          onTap: () => ref.read(expandedNodesProvider.notifier).toggle(c.id),
+          onTap: () => _toggleNode(ref, c.id),
           menu: [
             MenuItemButton(
               key: const ValueKey('collection-settings'),
@@ -623,7 +635,7 @@ class _FolderRow extends ConsumerWidget {
         child: _TreeRowShell(
           depth: depth,
           dropHighlight: candidates.isNotEmpty,
-          onTap: () => ref.read(expandedNodesProvider.notifier).toggle(f.id),
+          onTap: () => _toggleNode(ref, f.id),
           menu: [
             MenuItemButton(
               leadingIcon: const Icon(Icons.add, size: 16),

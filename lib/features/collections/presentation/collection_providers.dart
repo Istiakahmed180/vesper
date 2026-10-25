@@ -76,6 +76,24 @@ class ExpandedNodes extends Notifier<Set<String>> {
   void expand(Iterable<String> ids) => state = {...state, ...ids};
 }
 
+/// Collection/folder ids collapsed by hand while searching (search results
+/// start fully expanded). Cleared whenever the query changes.
+final searchCollapsedNodesProvider =
+    NotifierProvider<SearchCollapsedNodes, Set<String>>(
+      SearchCollapsedNodes.new,
+    );
+
+class SearchCollapsedNodes extends Notifier<Set<String>> {
+  @override
+  Set<String> build() {
+    ref.watch(sidebarSearchProvider);
+    return {};
+  }
+
+  void toggle(String id) =>
+      state = state.contains(id) ? ({...state}..remove(id)) : {...state, id};
+}
+
 /// Authorization and variables of a collection (secrets included).
 final collectionSettingsProvider =
     StreamProvider.family<CollectionSettings?, String>(
