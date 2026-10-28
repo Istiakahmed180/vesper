@@ -3,11 +3,11 @@ import 'package:flutter/foundation.dart';
 
 import '../../../../core/utils/id.dart';
 import '../../../../core/utils/json_read.dart';
-import 'saved_response.dart';
 import 'http_method.dart';
 import 'key_value.dart';
 import 'request_auth.dart';
 import 'request_body.dart';
+import 'saved_response.dart';
 import 'variable_extraction.dart';
 
 /// Per-request overrides of the global network settings.
