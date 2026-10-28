@@ -6,14 +6,14 @@ Vesper stores local data in SQLite through [Drift](https://drift.simonbinder.eu/
 
 Schema: `lib/core/storage/app_database.dart`. Generated code: `app_database.g.dart`, regenerated with `dart run build_runner build`. Dates are stored as ISO-8601 text, and foreign keys are enforced (`PRAGMA foreign_keys = ON`).
 
-## Tables (schema v5)
+## Tables (schema v6)
 
 | Table | Purpose | Notes |
 | --- | --- | --- |
 | `workspaces` | Workspaces | The `default` row ("My Workspace") always exists and cannot be deleted. `active_environment_id` is the environment selected in that workspace |
 | `collections` | Collections | `workspace_id`; `sort_order` for manual ordering within the workspace; `auth_json` (collection auth without secrets) and `variables_json` (secret values empty) |
 | `folders` | Nested folders | `collection_id` and `parent_id` cascade on delete |
-| `requests` | Saved requests | Params/headers/body/auth/options as typed JSON columns. **Auth secrets are not stored here.** |
+| `requests` | Saved requests | Params/headers/body/auth/options as typed JSON columns; `examples_json` holds saved example responses (sensitive headers masked, body capped at 1 MB). **Auth secrets are not stored here.** |
 | `environments` | Environments and one `is_global` Globals row per workspace | `workspace_id` |
 | `env_variables` | Variables | `value` is empty for secret variables (stored in the vault) |
 | `history_entries` | Sent requests | `workspace_id`; sanitized request snapshot; response bodies are not stored |
@@ -65,6 +65,8 @@ Steps run in order, so a user upgrading from v1 to v4 runs every step.
 **v3 → v4 (cloud sync):** creates `sync_outbox`, `sync_flags` and the change triggers (see cloud-sync.md), and renames Globals environments to `globals-<workspaceId>`. Their secret values move in the vault at the next start (`migrateEnvironmentVaultKeys`).
 
 **v4 → v5 (team workspaces):** creates `sync_scopes`.
+
+**v5 → v6 (example responses):** adds `examples_json` (`'[]'`) to `requests`.
 
 ## Streams
 

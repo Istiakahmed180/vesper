@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../../../core/utils/id.dart';
 import '../../../../core/utils/json_read.dart';
+import 'saved_response.dart';
 import 'http_method.dart';
 import 'key_value.dart';
 import 'request_auth.dart';
@@ -98,6 +99,7 @@ class ApiRequest {
     this.auth = const NoAuth(),
     this.options = const RequestOptions(),
     this.description = '',
+    this.examples = const [],
     this.collectionId,
     this.folderId,
     this.sortOrder = 0,
@@ -121,6 +123,10 @@ class ApiRequest {
   final RequestAuth auth;
   final RequestOptions options;
   final String description;
+
+  /// Saved success/error responses. Not part of [sameContentAs]: saving an
+  /// example never makes the request dirty.
+  final List<SavedResponse> examples;
   final String? collectionId;
   final String? folderId;
   final int sortOrder;
@@ -138,6 +144,7 @@ class ApiRequest {
     RequestAuth? auth,
     RequestOptions? options,
     String? description,
+    List<SavedResponse>? examples,
     String? Function()? collectionId,
     String? Function()? folderId,
     int? sortOrder,
@@ -154,6 +161,7 @@ class ApiRequest {
     auth: auth ?? this.auth,
     options: options ?? this.options,
     description: description ?? this.description,
+    examples: examples ?? this.examples,
     collectionId: collectionId != null ? collectionId() : this.collectionId,
     folderId: folderId != null ? folderId() : this.folderId,
     sortOrder: sortOrder ?? this.sortOrder,
@@ -188,6 +196,7 @@ class ApiRequest {
     'auth': auth.toJson(includeSecrets: includeSecrets),
     if (options.toJson().isNotEmpty) 'options': options.toJson(),
     if (description.isNotEmpty) 'description': description,
+    if (examples.isNotEmpty) 'examples': SavedResponse.listToJson(examples),
   };
 
   factory ApiRequest.fromJson(
@@ -206,6 +215,7 @@ class ApiRequest {
     auth: RequestAuth.fromJson(json.obj('auth')),
     options: RequestOptions.fromJson(json.obj('options')),
     description: json.str('description'),
+    examples: SavedResponse.listFromJson(json.objList('examples'), keepId: keepId),
     collectionId: collectionId,
     folderId: folderId,
   );

@@ -1,4 +1,5 @@
 import '../../api_client/domain/models/api_request.dart';
+import '../../api_client/domain/models/saved_response.dart';
 import 'collection_models.dart';
 
 /// Portable collection content used for import, export, duplicate and sync.
@@ -73,6 +74,10 @@ abstract class CollectionRepository {
   /// Inserts or updates [request]. It must have a collectionId.
   Future<ApiRequest> saveRequest(ApiRequest request);
   Future<void> renameRequest(String id, String name);
+
+  /// Replaces the saved example responses of request [id] without touching
+  /// the rest of the request.
+  Future<void> saveExamples(String id, List<SavedResponse> examples);
   Future<void> deleteRequest(String id);
   Future<ApiRequest> duplicateRequest(String id);
 

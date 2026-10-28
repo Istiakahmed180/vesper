@@ -22,6 +22,7 @@ import '../../../workspace/presentation/response_controller.dart';
 import '../../../workspace/presentation/variable_updater.dart';
 import '../../domain/models/api_response.dart';
 import 'body_formatter.dart';
+import 'examples_bar.dart';
 import 'set_variable_dialog.dart';
 
 class ResponsePanel extends ConsumerWidget {
@@ -32,9 +33,7 @@ class ResponsePanel extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(responseProvider(tabId));
-    return ColoredBox(
-      color: context.colors.panel,
-      child: switch (state) {
+    final view = switch (state) {
         ResponseIdle() => EmptyState(
           icon: Icons.send_outlined,
           title: 'Send a request to see the response',
@@ -59,7 +58,16 @@ class ResponsePanel extends ConsumerWidget {
             ),
           ],
         ),
-      },
+      };
+    return ColoredBox(
+      color: context.colors.panel,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ExamplesBar(tabId: tabId),
+          Expanded(child: view),
+        ],
+      ),
     );
   }
 }

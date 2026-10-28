@@ -6,6 +6,7 @@ import '../../../core/errors/app_failure.dart';
 import '../../../core/network/cancel_handle.dart';
 import '../../api_client/domain/models/api_request.dart';
 import '../../api_client/domain/models/api_response.dart';
+import '../../api_client/domain/models/saved_response.dart';
 import '../../api_client/domain/usecases/send_request.dart';
 import '../../collections/presentation/collection_providers.dart';
 import '../../environments/presentation/environment_providers.dart';
@@ -30,8 +31,15 @@ class ResponseLoading extends ResponseState {
 }
 
 class ResponseSuccess extends ResponseState {
-  const ResponseSuccess(this.response, {this.notes = const []});
+  const ResponseSuccess(
+    this.response, {
+    this.notes = const [],
+    this.example,
+  });
   final ApiResponse response;
+
+  /// Set when [response] is a saved example rather than a live response.
+  final SavedResponse? example;
 
   /// Results of the request's "Set variables" rules.
   final List<ExtractionNote> notes;
@@ -122,6 +130,70 @@ class ResponseController extends Notifier<ResponseState> {
         ),
       ];
     }
+  }
+
+  /// Shows a saved example in place of the live response.
+  void viewExample(SavedResponse example) {
+    final tab = ref.read(workspaceProvider).tab(tabId);
+    if (tab is! RequestTab) return;
+    cancel();
+    state = ResponseSuccess(
+      example.toApiResponse(
+        requestUrl: tab.draft.url,
+        method: tab.draft.method,
+      ),
+      example: example,
+    );
+  }
+
+  /// Whether the current live response can be saved as an example.
+  bool get canSaveExample {
+    final current = state;
+    return current is ResponseSuccess &&
+        current.example == null &&
+        SavedResponse.canSave(current.response);
+  }
+
+  /// Saves the live response on the saved request. Returns null when there is
+  /// nothing to save.
+  Future<SavedResponse?> saveExample({String? name}) async {
+    final current = state;
+    final tab = ref.read(workspaceProvider).tab(tabId);
+    if (current is! ResponseSuccess ||
+        current.example != null ||
+        tab is! RequestTab ||
+        !tab.isSaved) {
+      return null;
+    }
+    final example = SavedResponse.fromApiResponse(
+      current.response,
+      name: name,
+    );
+    await ref.read(workspaceProvider.notifier).setExamples(tabId, [
+      ...tab.draft.examples,
+      example,
+    ]);
+    return example;
+  }
+
+  Future<void> renameExample(String id, String name) async {
+    final tab = ref.read(workspaceProvider).tab(tabId);
+    if (tab is! RequestTab || name.trim().isEmpty) return;
+    await ref.read(workspaceProvider.notifier).setExamples(tabId, [
+      for (final e in tab.draft.examples)
+        e.id == id ? e.copyWith(name: name.trim()) : e,
+    ]);
+  }
+
+  Future<void> deleteExample(String id) async {
+    final tab = ref.read(workspaceProvider).tab(tabId);
+    if (tab is! RequestTab) return;
+    final shown = state;
+    if (shown is ResponseSuccess && shown.example?.id == id) clear();
+    await ref.read(workspaceProvider.notifier).setExamples(tabId, [
+      for (final e in tab.draft.examples)
+        if (e.id != id) e,
+    ]);
   }
 
   void cancel() {

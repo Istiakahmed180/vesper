@@ -9,6 +9,7 @@ import '../../../core/utils/id.dart';
 import '../../../core/utils/json_read.dart';
 import '../../api_client/domain/models/api_request.dart';
 import '../../api_client/domain/models/request_auth.dart';
+import '../../api_client/domain/models/saved_response.dart';
 import '../../environments/domain/environment_models.dart';
 import '../domain/collection_models.dart';
 import '../domain/collection_repository.dart';
@@ -557,6 +558,15 @@ class DriftCollectionRepository implements CollectionRepository {
     await _touchCollection(toSave.collectionId!);
     return toSave;
   }
+
+  @override
+  Future<void> saveExamples(String id, List<SavedResponse> examples) =>
+      (_db.update(_db.requests)..where((r) => r.id.equals(id))).write(
+        RequestsCompanion(
+          examplesJson: Value(jsonEncode(SavedResponse.listToJson(examples))),
+          updatedAt: Value(DateTime.now()),
+        ),
+      );
 
   @override
   Future<void> renameRequest(String id, String name) =>

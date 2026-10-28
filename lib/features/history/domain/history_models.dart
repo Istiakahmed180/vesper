@@ -92,6 +92,7 @@ class HistorySanitizer {
       params: params,
       auth: auth,
       body: request.body.copyWith(urlEncoded: urlEncoded),
+      examples: const [],
     );
   }
 

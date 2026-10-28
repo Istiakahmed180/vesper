@@ -9,6 +9,7 @@ import '../../api_client/domain/models/http_method.dart';
 import '../../api_client/domain/models/key_value.dart';
 import '../../api_client/domain/models/request_auth.dart';
 import '../../api_client/domain/models/request_body.dart';
+import '../../api_client/domain/models/saved_response.dart';
 
 /// Converts between [RequestRow]s and [ApiRequest]s. Secret auth values are
 /// never written to the row.
@@ -36,6 +37,7 @@ class RequestRowMapper {
     auth: RequestAuth.fromJson(decodeMap(row.authJson)),
     options: RequestOptions.fromJson(decodeMap(row.optionsJson)),
     description: row.description,
+    examples: SavedResponse.listFromJson(decodeList(row.examplesJson)),
     collectionId: row.collectionId,
     folderId: row.folderId,
     sortOrder: row.sortOrder,
@@ -56,6 +58,7 @@ class RequestRowMapper {
     authJson: Value(jsonEncode(r.auth.toJson())),
     optionsJson: Value(jsonEncode(r.options.toJson())),
     description: Value(r.description),
+    examplesJson: Value(jsonEncode(SavedResponse.listToJson(r.examples))),
     sortOrder: Value(r.sortOrder),
     createdAt: Value(r.createdAt),
     updatedAt: Value(r.updatedAt),

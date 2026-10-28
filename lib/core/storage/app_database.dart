@@ -81,6 +81,9 @@ class Requests extends Table {
   TextColumn get authJson => text().withDefault(const Constant('{}'))();
   TextColumn get optionsJson => text().withDefault(const Constant('{}'))();
   TextColumn get description => text().withDefault(const Constant(''))();
+
+  /// Saved example responses (success and error), a JSON array.
+  TextColumn get examplesJson => text().withDefault(const Constant('[]'))();
   IntColumn get sortOrder => integer().withDefault(const Constant(0))();
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get updatedAt => dateTime()();
@@ -236,7 +239,7 @@ class AppDatabase extends _$AppDatabase {
 
   /// Bump when the schema changes and add a step in [migration].
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -254,6 +257,7 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 4) await _migrateToCloudSync(m);
       if (from < 5) await m.createTable(syncScopes);
+      if (from < 6) await m.addColumn(requests, requests.examplesJson);
     },
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = ON');

@@ -7,6 +7,7 @@ import '../../../core/utils/json_read.dart';
 import '../../api_client/domain/models/api_request.dart';
 import '../../api_client/domain/models/key_value.dart';
 import '../../api_client/domain/models/request_auth.dart';
+import '../../api_client/domain/models/saved_response.dart';
 import '../../api_client/domain/services/url_utils.dart';
 import '../../collections/domain/collection_models.dart';
 import '../../collections/presentation/collection_providers.dart';
@@ -327,6 +328,26 @@ class WorkspaceController extends Notifier<WorkspaceState> {
     if (tabs.isEmpty || workspaceId != _workspaceId || !untouched) return;
     _set(
       WorkspaceState(tabs: tabs, activeTabId: activeId ?? tabs.first.id),
+      persist: false,
+    );
+  }
+
+  /// Stores [examples] on the saved request open in [tabId]. Only the examples
+  /// are written, so unsaved edits in the draft stay unsaved.
+  Future<void> setExamples(String tabId, List<SavedResponse> examples) async {
+    final tab = state.tab(tabId);
+    if (tab is! RequestTab || !tab.isSaved) return;
+    await ref
+        .read(collectionRepositoryProvider)
+        .saveExamples(tab.savedRequestId!, examples);
+    final current = state.tab(tabId);
+    if (current is! RequestTab) return;
+    _replaceTab(
+      tabId,
+      current.copyWith(
+        draft: current.draft.copyWith(examples: examples),
+        baseline: () => current.baseline?.copyWith(examples: examples),
+      ),
       persist: false,
     );
   }

@@ -6,6 +6,7 @@ import '../../api_client/domain/models/http_method.dart';
 import '../../api_client/domain/models/key_value.dart';
 import '../../api_client/domain/models/request_auth.dart';
 import '../../api_client/domain/models/request_body.dart';
+import '../../api_client/domain/models/saved_response.dart';
 import '../../api_client/domain/services/url_utils.dart';
 import '../../collections/domain/collection_models.dart';
 import '../../collections/domain/collection_repository.dart';
@@ -63,7 +64,9 @@ class PostmanCollectionImporter implements CollectionImporter {
             ),
           );
         } else if (item['request'] != null) {
-          final request = _request(item, name, counter, warnings);
+          final request = _request(item, name, counter, warnings).copyWith(
+            examples: _examples(item.objList('response'), counter),
+          );
           out.add(
             RequestItem(
               request.auth is InheritAuth && folderAuth != null
@@ -150,6 +153,31 @@ class PostmanCollectionImporter implements CollectionImporter {
       description: _description(req['description']),
     );
   }
+
+  static const _maxExamples = 50;
+
+  /// Postman saved responses become examples; the embedded original request
+  /// is ignored.
+  List<SavedResponse> _examples(List<JsonMap> raw, ImportCounter counter) => [
+    for (final r in raw.take(_maxExamples))
+      SavedResponse(
+        name: counter.text(r['name'], fallback: 'Example'),
+        statusCode: r.integer('code', 200),
+        statusMessage: counter.text(r['status']),
+        headers: [
+          for (final h in r.objList('header'))
+            MapEntry(
+              counter.text(h['key']).toLowerCase(),
+              counter.text(h['value']),
+            ),
+        ],
+        body: _truncate(counter.text(r['body'])),
+      ),
+  ];
+
+  static String _truncate(String s) => s.length > SavedResponse.maxBodyChars
+      ? s.substring(0, SavedResponse.maxBodyChars)
+      : s;
 
   String _url(Object? url, ImportCounter counter) {
     if (url is String) return counter.text(url);
