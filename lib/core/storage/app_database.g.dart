@@ -1608,6 +1608,18 @@ class $RequestsTable extends Requests
     requiredDuringInsert: false,
     defaultValue: const Constant(''),
   );
+  static const VerificationMeta _examplesJsonMeta = const VerificationMeta(
+    'examplesJson',
+  );
+  @override
+  late final GeneratedColumn<String> examplesJson = GeneratedColumn<String>(
+    'examples_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('[]'),
+  );
   static const VerificationMeta _sortOrderMeta = const VerificationMeta(
     'sortOrder',
   );
@@ -1656,6 +1668,7 @@ class $RequestsTable extends Requests
     authJson,
     optionsJson,
     description,
+    examplesJson,
     sortOrder,
     createdAt,
     updatedAt,
@@ -1763,6 +1776,15 @@ class $RequestsTable extends Requests
         ),
       );
     }
+    if (data.containsKey('examples_json')) {
+      context.handle(
+        _examplesJsonMeta,
+        examplesJson.isAcceptableOrUnknown(
+          data['examples_json']!,
+          _examplesJsonMeta,
+        ),
+      );
+    }
     if (data.containsKey('sort_order')) {
       context.handle(
         _sortOrderMeta,
@@ -1842,6 +1864,10 @@ class $RequestsTable extends Requests
         DriftSqlType.string,
         data['${effectivePrefix}description'],
       )!,
+      examplesJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}examples_json'],
+      )!,
       sortOrder: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}sort_order'],
@@ -1876,6 +1902,7 @@ class RequestRow extends DataClass implements Insertable<RequestRow> {
   final String authJson;
   final String optionsJson;
   final String description;
+  final String examplesJson;
   final int sortOrder;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -1892,6 +1919,7 @@ class RequestRow extends DataClass implements Insertable<RequestRow> {
     required this.authJson,
     required this.optionsJson,
     required this.description,
+    required this.examplesJson,
     required this.sortOrder,
     required this.createdAt,
     required this.updatedAt,
@@ -1913,6 +1941,7 @@ class RequestRow extends DataClass implements Insertable<RequestRow> {
     map['auth_json'] = Variable<String>(authJson);
     map['options_json'] = Variable<String>(optionsJson);
     map['description'] = Variable<String>(description);
+    map['examples_json'] = Variable<String>(examplesJson);
     map['sort_order'] = Variable<int>(sortOrder);
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
@@ -1935,6 +1964,7 @@ class RequestRow extends DataClass implements Insertable<RequestRow> {
       authJson: Value(authJson),
       optionsJson: Value(optionsJson),
       description: Value(description),
+      examplesJson: Value(examplesJson),
       sortOrder: Value(sortOrder),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
@@ -1959,6 +1989,7 @@ class RequestRow extends DataClass implements Insertable<RequestRow> {
       authJson: serializer.fromJson<String>(json['authJson']),
       optionsJson: serializer.fromJson<String>(json['optionsJson']),
       description: serializer.fromJson<String>(json['description']),
+      examplesJson: serializer.fromJson<String>(json['examplesJson']),
       sortOrder: serializer.fromJson<int>(json['sortOrder']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
@@ -1980,6 +2011,7 @@ class RequestRow extends DataClass implements Insertable<RequestRow> {
       'authJson': serializer.toJson<String>(authJson),
       'optionsJson': serializer.toJson<String>(optionsJson),
       'description': serializer.toJson<String>(description),
+      'examplesJson': serializer.toJson<String>(examplesJson),
       'sortOrder': serializer.toJson<int>(sortOrder),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
@@ -1999,6 +2031,7 @@ class RequestRow extends DataClass implements Insertable<RequestRow> {
     String? authJson,
     String? optionsJson,
     String? description,
+    String? examplesJson,
     int? sortOrder,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -2015,6 +2048,7 @@ class RequestRow extends DataClass implements Insertable<RequestRow> {
     authJson: authJson ?? this.authJson,
     optionsJson: optionsJson ?? this.optionsJson,
     description: description ?? this.description,
+    examplesJson: examplesJson ?? this.examplesJson,
     sortOrder: sortOrder ?? this.sortOrder,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
@@ -2043,6 +2077,9 @@ class RequestRow extends DataClass implements Insertable<RequestRow> {
       description: data.description.present
           ? data.description.value
           : this.description,
+      examplesJson: data.examplesJson.present
+          ? data.examplesJson.value
+          : this.examplesJson,
       sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
@@ -2064,6 +2101,7 @@ class RequestRow extends DataClass implements Insertable<RequestRow> {
           ..write('authJson: $authJson, ')
           ..write('optionsJson: $optionsJson, ')
           ..write('description: $description, ')
+          ..write('examplesJson: $examplesJson, ')
           ..write('sortOrder: $sortOrder, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
@@ -2085,6 +2123,7 @@ class RequestRow extends DataClass implements Insertable<RequestRow> {
     authJson,
     optionsJson,
     description,
+    examplesJson,
     sortOrder,
     createdAt,
     updatedAt,
@@ -2105,6 +2144,7 @@ class RequestRow extends DataClass implements Insertable<RequestRow> {
           other.authJson == this.authJson &&
           other.optionsJson == this.optionsJson &&
           other.description == this.description &&
+          other.examplesJson == this.examplesJson &&
           other.sortOrder == this.sortOrder &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
@@ -2123,6 +2163,7 @@ class RequestsCompanion extends UpdateCompanion<RequestRow> {
   final Value<String> authJson;
   final Value<String> optionsJson;
   final Value<String> description;
+  final Value<String> examplesJson;
   final Value<int> sortOrder;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
@@ -2140,6 +2181,7 @@ class RequestsCompanion extends UpdateCompanion<RequestRow> {
     this.authJson = const Value.absent(),
     this.optionsJson = const Value.absent(),
     this.description = const Value.absent(),
+    this.examplesJson = const Value.absent(),
     this.sortOrder = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -2158,6 +2200,7 @@ class RequestsCompanion extends UpdateCompanion<RequestRow> {
     this.authJson = const Value.absent(),
     this.optionsJson = const Value.absent(),
     this.description = const Value.absent(),
+    this.examplesJson = const Value.absent(),
     this.sortOrder = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
@@ -2182,6 +2225,7 @@ class RequestsCompanion extends UpdateCompanion<RequestRow> {
     Expression<String>? authJson,
     Expression<String>? optionsJson,
     Expression<String>? description,
+    Expression<String>? examplesJson,
     Expression<int>? sortOrder,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
@@ -2200,6 +2244,7 @@ class RequestsCompanion extends UpdateCompanion<RequestRow> {
       if (authJson != null) 'auth_json': authJson,
       if (optionsJson != null) 'options_json': optionsJson,
       if (description != null) 'description': description,
+      if (examplesJson != null) 'examples_json': examplesJson,
       if (sortOrder != null) 'sort_order': sortOrder,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -2220,6 +2265,7 @@ class RequestsCompanion extends UpdateCompanion<RequestRow> {
     Value<String>? authJson,
     Value<String>? optionsJson,
     Value<String>? description,
+    Value<String>? examplesJson,
     Value<int>? sortOrder,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
@@ -2238,6 +2284,7 @@ class RequestsCompanion extends UpdateCompanion<RequestRow> {
       authJson: authJson ?? this.authJson,
       optionsJson: optionsJson ?? this.optionsJson,
       description: description ?? this.description,
+      examplesJson: examplesJson ?? this.examplesJson,
       sortOrder: sortOrder ?? this.sortOrder,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -2284,6 +2331,9 @@ class RequestsCompanion extends UpdateCompanion<RequestRow> {
     if (description.present) {
       map['description'] = Variable<String>(description.value);
     }
+    if (examplesJson.present) {
+      map['examples_json'] = Variable<String>(examplesJson.value);
+    }
     if (sortOrder.present) {
       map['sort_order'] = Variable<int>(sortOrder.value);
     }
@@ -2314,6 +2364,7 @@ class RequestsCompanion extends UpdateCompanion<RequestRow> {
           ..write('authJson: $authJson, ')
           ..write('optionsJson: $optionsJson, ')
           ..write('description: $description, ')
+          ..write('examplesJson: $examplesJson, ')
           ..write('sortOrder: $sortOrder, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
@@ -6572,6 +6623,7 @@ typedef $$RequestsTableCreateCompanionBuilder =
       Value<String> authJson,
       Value<String> optionsJson,
       Value<String> description,
+      Value<String> examplesJson,
       Value<int> sortOrder,
       required DateTime createdAt,
       required DateTime updatedAt,
@@ -6591,6 +6643,7 @@ typedef $$RequestsTableUpdateCompanionBuilder =
       Value<String> authJson,
       Value<String> optionsJson,
       Value<String> description,
+      Value<String> examplesJson,
       Value<int> sortOrder,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
@@ -6692,6 +6745,10 @@ class $$RequestsTableFilterComposer
 
   ColumnFilters<String> get description => $composableBuilder(
     column: $table.description,
+    builder: (column) => ColumnFilters(column),
+  );
+  ColumnFilters<String> get examplesJson => $composableBuilder(
+    column: $table.examplesJson,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -6815,6 +6872,10 @@ class $$RequestsTableOrderingComposer
     column: $table.description,
     builder: (column) => ColumnOrderings(column),
   );
+  ColumnOrderings<String> get examplesJson => $composableBuilder(
+    column: $table.examplesJson,
+    builder: (column) => ColumnOrderings(column),
+  );
 
   ColumnOrderings<int> get sortOrder => $composableBuilder(
     column: $table.sortOrder,
@@ -6924,6 +6985,10 @@ class $$RequestsTableAnnotationComposer
     column: $table.description,
     builder: (column) => column,
   );
+  GeneratedColumn<String> get examplesJson => $composableBuilder(
+    column: $table.examplesJson,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<int> get sortOrder =>
       $composableBuilder(column: $table.sortOrder, builder: (column) => column);
@@ -7021,6 +7086,7 @@ class $$RequestsTableTableManager
                 Value<String> authJson = const Value.absent(),
                 Value<String> optionsJson = const Value.absent(),
                 Value<String> description = const Value.absent(),
+                Value<String> examplesJson = const Value.absent(),
                 Value<int> sortOrder = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
@@ -7038,6 +7104,7 @@ class $$RequestsTableTableManager
                 authJson: authJson,
                 optionsJson: optionsJson,
                 description: description,
+                examplesJson: examplesJson,
                 sortOrder: sortOrder,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
@@ -7057,6 +7124,7 @@ class $$RequestsTableTableManager
                 Value<String> authJson = const Value.absent(),
                 Value<String> optionsJson = const Value.absent(),
                 Value<String> description = const Value.absent(),
+                Value<String> examplesJson = const Value.absent(),
                 Value<int> sortOrder = const Value.absent(),
                 required DateTime createdAt,
                 required DateTime updatedAt,
@@ -7074,6 +7142,7 @@ class $$RequestsTableTableManager
                 authJson: authJson,
                 optionsJson: optionsJson,
                 description: description,
+                examplesJson: examplesJson,
                 sortOrder: sortOrder,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
